@@ -1,0 +1,37 @@
+name: TCMB kurlarını güncelle
+on:
+  schedule:
+    - cron: "43 6,12 * * 1-5"   # İstanbul 09:43 ve 15:43 (hafta içi)
+  workflow_dispatch: {}
+jobs:
+  kur:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kurları al ve kaydet
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os, json, urllib.request, xml.etree.ElementTree as ET, datetime
+          xml = urllib.request.urlopen(urllib.request.Request("https://www.tcmb.gov.tr/kurlar/today.xml", headers={"User-Agent": "Mozilla/5.0"}), timeout=30).read()
+          root = ET.fromstring(xml)
+          d, m, y = root.attrib["Tarih"].split(".")
+          rates = {}
+          for c in root.findall("Currency"):
+              code = c.attrib.get("CurrencyCode")
+              if code in ("USD", "EUR"):
+                  rates[code] = float(c.find("ForexSelling").text)
+          assert 10 < rates["USD"] < 500 and rates["USD"] < rates["EUR"] < 500, rates
+          doc = {"collection": "counter", "id": "rate",
+                 "data": {"eur": rates["EUR"], "usd": rates["USD"], "date": f"{y}-{m}-{d}", "source": "TCMB döviz satış",
+                          "fetchedAt": datetime.datetime.utcnow().isoformat() + "Z"},
+                 "updated_at": datetime.datetime.utcnow().isoformat() + "Z"}
+          url = os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/docs?on_conflict=collection,id"
+          key = os.environ["SUPABASE_SERVICE_KEY"]
+          req = urllib.request.Request(url, data=json.dumps(doc).encode(), method="POST", headers={
+              "apikey": key, "Authorization": "Bearer " + key, "Content-Type": "application/json",
+              "Prefer": "resolution=merge-duplicates"})
+          urllib.request.urlopen(req, timeout=30)
+          print("Kaydedildi:", doc["data"])
+          PY
