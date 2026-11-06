@@ -461,7 +461,7 @@ function addItem(code,vi){
   const p=PIDX[code];if(!p)return;
   const v=p.variants?.length?p.variants[vi||0]:null;
   const price=v?v.price:p.price;
-  Q.items.push({k:uid(),code,name:p.name,variant:v?v.v:'',varLabel:p.varLabel||'',qty:1,unit:p.unit||'adet',net:p.vatDefault==='excl'?price:toNet(price,p.cur),vat:p.vatDefault||(isIncl(p.cur)?'incl':'excl'),cur:p.cur,disc:0,img:v?.img||p.img||'',detail:true});
+  Q.items.push({k:uid(),code,name:p.name,note:p.defNote||'',variant:v?v.v:'',varLabel:p.varLabel||'',qty:1,unit:p.unit||'adet',net:p.vatDefault==='excl'?price:toNet(price,p.cur),vat:p.vatDefault||(isIncl(p.cur)?'incl':'excl'),cur:p.cur,disc:0,img:v?.img||p.img||'',detail:true});
   saveDraft();renderItems();renderGrid();toast(p.name+' eklendi');
 }
 const MONCAT='Baca ve Montaj Ekipmanları';
@@ -687,7 +687,7 @@ $('#newq').onclick=()=>{Q=blankQuote();saveDraft();bindQuoteFields();renderItems
 function footHTML(n,total){return `<div class="d-foot"><div>${esc(S.title)}<br>${esc(S.addr)}</div><div style="text-align:right;white-space:nowrap">Tel ${esc(S.phone)}<br>${esc(S.mail)} · ${esc(S.web)}<br>Sayfa ${n} / ${total}</div></div>`}
 function headHTML(no){return `<div class="d-head"><img src="logo.png" alt=""><div class="ttl"><h1>FİYAT TEKLİFİ</h1><div>Teklif No: <b>${esc(no)}</b></div><div>Tarih: ${trDate(Q.date)} · Geçerlilik: ${trDate(addDays(Q.date,Q.valid))}</div></div></div>`}
 function miniHead(no,title){return `<div class="d-head" style="padding-bottom:10px"><img src="logo.png" alt="" style="height:30px"><div class="ttl"><div class="d-cont">${esc(title)}</div><div>Teklif No: ${esc(no)} · ${trDate(Q.date)}</div></div></div>`}
-function specLine(i){const p=PIDX[i.code];const nt=i.note||i.desc;if(nt){const t=nt.replace(/\s+/g,' ');return esc(t.length>160?t.slice(0,t.lastIndexOf(' ',155))+'…':t)}if(!p)return '';if(p.made){const t=(p.short||'').split('. ')[0];return esc(t.length>110?t.slice(0,t.lastIndexOf(' ',105))+'…':t)}
+function specLine(i){const p=PIDX[i.code];const nt=i.note||i.desc;if(nt){const t=nt.trim().replace(/[ \t]+/g,' ');return esc(t.length>520?t.slice(0,t.lastIndexOf(' ',515))+'…':t).replace(/\n/g,'<br>')}if(!p)return '';if(p.made){const t=(p.short||'').split('. ')[0];return esc(t.length>110?t.slice(0,t.lastIndexOf(' ',105))+'…':t)}
   const parts=[];if(i.variant)parts.push((i.varLabel||'Seçenek')+': '+i.variant);
   const pri=[/^(Dış )?[Öö]lçü|^Boyut/,/^Cam tipi/,/[Gg]üç(?! aralığı)|Nominal güç|Anma gücü/,/Isıtma alanı/,/^Yakıt/,/Set içeriği|Kaplama alanı|Çap seçenekleri|Taban|Sıcaklık dayanımı|Malzeme|Uzunluk/];
   const skip=/^(Seri|Model|Garanti|Belge|Kontrol|Elektrik bağlantısı)$/;const used=new Set();
