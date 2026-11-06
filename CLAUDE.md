@@ -21,5 +21,6 @@ Ana dalda (`main`) yapılan her değişiklik GitHub Pages ile birkaç dakikada c
 ## Güncelleme kuralları
 - Katalog değişiklikleri `data/products.json` (+ gerekirse `data/thumbs.json`, `img/`) üzerinden yapılır; fiyatları kullanıcı programdan girer (overrides), json'daki fiyatları ezme.
 - Para birimleri: EUR, USD, TRY. KDV her kalemde ayrı (incl/excl).
+- "Baca · Isı Odası" sekmesi: `Baca ve Isı Odası Uygulamaları` kategorisindeki işler (ısı odası, kat arası baca, boru çekimi, çatı üzeri baca, baca şapkası); fiyatları KDV hariç (`vatDefault: 'excl'`), `gallery` ek fotoğraflar.
 - PDF sırası: firma + teşekkür sayfası → ürün sayfaları → montaj malzemeleri → fiyatlandırma.
 - Değişiklikten sonra yerelde `python3 -m http.server` ile açıp kontrol et, sonra `main`'e gönder.
