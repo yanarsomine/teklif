@@ -417,10 +417,12 @@ let Q=null; // current quote
 let cat='Tümü', sub=null;
 
 /* ---------- products ---------- */
+const TEXTKEYS=['name','cat','sub','unit','cur','short','defNote','feats','specs','varLabel','variants'];
 function buildProducts(){
   const arr=BASE.map(p=>({...p}));
   Object.values(CUSTOM).forEach(c=>arr.push({...c,custom:true,variants:c.variants||[],specs:c.specs||[],feats:c.feats||[]}));
   arr.forEach(p=>{const o=OVR[p.code];if(!o)return;
+    TEXTKEYS.forEach(k=>{if(o[k]!=null)p[k]=Array.isArray(o[k])?o[k].map(x=>Array.isArray(x)?[...x]:(x&&typeof x==='object'?{...x}:x)):o[k]});
     if(o.price!=null&&o.price!=='')p.price=Number(o.price);
     if(o.vprices&&p.variants)p.variants=p.variants.map(v=>o.vprices[v.v]!=null?{...v,price:Number(o.vprices[v.v])}:v);
     if(o.drw)p.drw=o.drw; if(o.img){p.img=o.img;p.thumb=o.img} if(o.hidden)p.hidden=true;});
@@ -910,7 +912,7 @@ function renderPAdmin(){
      :`<div class="kv"><input type="number" min="0" step="0.01" data-p value="${p.price||''}" placeholder="Fiyat" style="width:110px;border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:var(--bg)"> ${CURS[p.cur]||'₺'}</div>`}</td>
    <td>${p.drw?`<a href="${esc(p.drw)}" target="_blank" rel="noopener"><img class="mini" src="${esc(p.drw)}" alt="çizim"></a>`:'<span class="note">yok</span>'}<br><label class="btn sm" style="display:inline-block;margin-top:4px">${p.drw?'Değiştir':'Yükle'}<input type="file" accept="image/*" data-up="drw" hidden></label></td>
    <td><label class="btn sm" style="display:inline-block">Fotoğraf yükle<input type="file" accept="image/*" data-up="img" hidden></label></td>
-   <td><button class="btn sm ghost" data-hide>${p.hidden?'Göster':'Gizle'}</button></td></tr>`).join('')||'<tr><td colspan="7"><div class="empty">Eşleşen ürün yok.</div></td></tr>';
+   <td style="white-space:nowrap"><button class="btn sm" data-edit>Düzenle</button> <button class="btn sm ghost" data-hide>${p.hidden?'Göster':'Gizle'}</button>${OVR[p.code]&&TEXTKEYS.some(k=>OVR[p.code][k]!=null)?'<div class="note" style="margin-top:2px">düzenlendi</div>':''}</td></tr>`).join('')||'<tr><td colspan="7"><div class="empty">Eşleşen ürün yok.</div></td></tr>';
 }
 async function setOvr(code,patch){
   OVR[code]={...(OVR[code]||{}),...patch};buildProducts();
@@ -926,6 +928,49 @@ $('#plist').addEventListener('change',async e=>{const tr=e.target.closest('tr');
   if(!assets){toast('Dosya yükleme bu görünümde kullanılamıyor');return}
   try{toast('Yükleniyor…',1500);const r=await assets.upload(f);await setOvr(code,{[e.target.dataset.up]:r.url});renderPAdmin();renderGrid();toast('Yüklendi')}
   catch(err){toast('Yüklenemedi: '+(err?.message||err?.code),4000)}});
+$('#plist').addEventListener('click',e=>{const ed=e.target.closest('[data-edit]');if(ed){openEditor(ed.closest('tr').dataset.code);return}});
+function openEditor(code){
+  const p=PIDX[code];if(!p)return;const base=BASE.find(x=>x.code===code)||CUSTOM[code];
+  const cats=[...new Set([...CATORDER,...P.map(x=>x.cat)])];
+  const m=document.createElement('div');m.className='modal';
+  const ta=(id,lab,val,rows,ph)=>`<div class="f w2"><label for="${id}">${lab}</label><textarea id="${id}" rows="${rows}" placeholder="${esc(ph||'')}">${esc(val||'')}</textarea></div>`;
+  m.innerHTML=`<form class="dlg" id="edf" style="max-width:760px">
+   <div style="display:flex;gap:10px;align-items:center"><img src="${esc(thumbOf(p))}" alt="" style="width:48px;height:48px;object-fit:contain;background:#fff;border-radius:6px"><div><h2 style="margin:0;font-size:17px">Ürünü düzenle</h2><div class="note">${esc(code)}</div></div></div>
+   <div class="fields">
+    <div class="f w2"><label for="ed-name">Ürün adı</label><input id="ed-name" value="${esc(p.name)}" required></div>
+    <div class="f"><label for="ed-cat">Kategori</label><select id="ed-cat">${cats.map(c=>`<option ${c===p.cat?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+    <div class="f"><label for="ed-sub">Alt kategori</label><input id="ed-sub" value="${esc(p.sub||'')}"></div>
+    <div class="f"><label for="ed-unit">Birim</label><input id="ed-unit" value="${esc(p.unit||'adet')}" list="ed-units"><datalist id="ed-units">${['adet','m','m²','paket','rulo','takım','set','kat','iş'].map(u=>`<option>${u}</option>`).join('')}</datalist></div>
+    <div class="f"><label for="ed-cur">Para birimi</label><select id="ed-cur">${['TRY','EUR','USD'].map(c=>`<option value="${c}" ${p.cur===c?'selected':''}>${CURN[c]}</option>`).join('')}</select></div>
+    ${ta('ed-short','Ürün açıklaması (ürün sayfasında görünür)',p.short,4)}
+    ${ta('ed-def','Teklife otomatik gelen açıklama (fiyat tablosunda ürün adının altında; boş bırakılabilir)',p.defNote,3)}
+    ${ta('ed-feats','Öne çıkan özellikler (her satıra bir madde)',(p.feats||[]).join('\n'),5)}
+    ${ta('ed-specs','Teknik özellikler (her satıra "Özellik: Değer")',(p.specs||[]).map(s=>s[0]+': '+s[1]).join('\n'),6,'Ölçü: 60 × 90 × 40 cm')}
+    <div class="f"><label for="ed-vlab">Seçenek başlığı</label><input id="ed-vlab" value="${esc(p.varLabel||'')}" placeholder="ör. Çap, Ölçü, Renk"></div>
+    <div class="f"><label>&nbsp;</label><div class="note">Seçenek yoksa boş bırakın.</div></div>
+    ${ta('ed-vars','Seçenekler (her satıra "Seçenek adı | fiyat")',(p.variants||[]).map(v=>v.v+(v.price?' | '+String(v.price).replace('.',','):'')).join('\n'),4,'Ø 200 mm | 2000')}
+   </div>
+   <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap">
+    <button type="button" class="btn ghost dng" id="ed-reset" ${OVR[code]&&TEXTKEYS.some(k=>OVR[code][k]!=null)?'':'disabled'}>Orijinal bilgilere dön</button>
+    <div style="display:flex;gap:8px"><button type="button" class="btn" id="ed-x">Vazgeç</button><button class="btn pri">Kaydet</button></div></div></form>`;
+  document.body.appendChild(m);
+  m.querySelector('#ed-x').onclick=()=>m.remove();
+  m.querySelector('#ed-reset').onclick=async()=>{const o={...(OVR[code]||{})};TEXTKEYS.forEach(k=>delete o[k]);OVR[code]=o;buildProducts();
+    if(db)try{await db.doc('overrides/'+code.replace(/[^A-Za-z0-9_-]/g,'_')).set({code,...o})}catch(e){toast('Kaydedilemedi');return}
+    m.remove();renderPAdmin();renderCats();renderGrid();renderItems();toast('Orijinal bilgilere dönüldü')};
+  m.querySelector('#edf').onsubmit=async ev=>{ev.preventDefault();const g=id=>m.querySelector(id).value;
+    const lines=t=>t.split('\n').map(x=>x.trim()).filter(Boolean);
+    const num=x=>{x=String(x).replace(/[₺€$\s]/g,'');return Number(x.includes(',')||/^\d{1,3}(\.\d{3})+$/.test(x)?x.replace(/\./g,'').replace(',','.'):x)||0};
+    const oldV=Object.fromEntries((p.variants||[]).map(v=>[v.v,v]));
+    const variants=lines(g('#ed-vars')).map(l=>{const [v,pr]=l.split('|').map(x=>x.trim());return {...(oldV[v]||{}),v,price:pr!=null&&pr!==''?num(pr):(oldV[v]?.price||0)}});
+    const patch={name:g('#ed-name').trim(),cat:g('#ed-cat'),sub:g('#ed-sub').trim()||g('#ed-cat'),unit:g('#ed-unit').trim()||'adet',cur:g('#ed-cur'),
+      short:g('#ed-short').trim(),defNote:g('#ed-def').trim(),feats:lines(g('#ed-feats')),
+      specs:lines(g('#ed-specs')).map(l=>{const i=l.indexOf(':');return i>0?[l.slice(0,i).trim(),l.slice(i+1).trim()]:[l,'']}),
+      varLabel:g('#ed-vlab').trim(),variants,vprices:null};
+    await setOvr(code,patch);
+    m.remove();renderPAdmin();renderCats();renderGrid();renderItems();toast('Ürün bilgileri kaydedildi');
+  };
+}
 $('#plist').addEventListener('click',e=>{const b=e.target.closest('[data-hide]');if(!b)return;const code=b.closest('tr').dataset.code;setOvr(code,{hidden:!PIDX[code].hidden});renderPAdmin();renderCats();renderGrid()});
 $('#pq').oninput=renderPAdmin;$('#pnp').onchange=renderPAdmin;
 $('#newprod').onclick=()=>{

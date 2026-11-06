@@ -14,7 +14,7 @@ Ana dalda (`main`) yapılan her değişiklik GitHub Pages ile birkaç dakikada c
 - `.github/workflows/kur.yml` — hafta içi 09:43 ve 15:43'te TCMB döviz satış kurunu `docs(counter/rate)` satırına yazar (secrets: SUPABASE_URL, SUPABASE_SERVICE_KEY).
 
 ## Veri (Supabase `docs` tablosu: collection, id, data jsonb)
-- `quotes/<teklif no>` teklifler · `config/settings` ayarlar · `overrides/<kod>` fiyat/resim/gizleme değişiklikleri
+- `quotes/<teklif no>` teklifler · `config/settings` ayarlar · `overrides/<kod>` fiyat/resim/gizleme ve metin değişiklikleri (name, cat, sub, unit, cur, short, defNote, feats, specs, varLabel, variants — "Düzenle" penceresi)
 - `custom/<kod>` programdan eklenen ürünler · `counter/quotes` sıradaki numara · `counter/rate` {eur, usd, date}
 - Roller `profiles.role`: `admin` (fiyat, ayar, ürün düzenler) / `staff` (teklif hazırlar).
 
