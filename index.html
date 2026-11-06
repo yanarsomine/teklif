@@ -113,6 +113,12 @@ button{cursor:pointer}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .seg button{border:0;background:var(--panel);padding:6px 12px;font-weight:600;color:var(--muted)}
 .seg button[aria-checked="true"]{background:var(--brand);color:var(--brand-ink)}
+.pimgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.pimg{position:relative;border:1px solid var(--line);border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:4px;cursor:pointer;background:var(--panel);font-size:11.5px}
+.pimg.on{border-color:var(--brand);background:var(--brand-soft)}
+.pimg img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:5px;background:#fff}
+.pimg input[type=checkbox]{position:absolute;top:10px;left:10px;width:18px;height:18px}
+.pimg.add{align-items:center;justify-content:center;text-align:center;color:var(--muted);border-style:dashed;min-height:150px}
 .stabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:10px;flex-wrap:wrap}
 .stab{border:0;background:none;padding:7px 10px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
 .stab[aria-selected="true"]{color:var(--brand);border-bottom-color:var(--brand)}
@@ -465,6 +471,7 @@ function addItem(code,vi){
   saveDraft();renderItems();renderGrid();toast(p.name+' eklendi');
 }
 const MONCAT='Baca ve Montaj Ekipmanları';
+const PKGIMGS=[{src:'img/montaj/duz-camli.jpg',label:'Düz camlı hazne – A1 yanmaz levha ısı odası'},{src:'img/montaj/kose-camli.jpg',label:'Köşe camlı hazne – A1 yanmaz levha ısı odası'}];
 const VR=()=>1+S.vat/100, incl=i=>(i?.vat||'excl')==='incl', NOVAT=()=>Q.opts.addVat===false&&!ALL().some(incl);
 const showP=(n,i)=>incl(i)?n*VR():n, fromP=(v,i)=>incl(i)?v/VR():v, modeLbl=i=>incl(i)?'KDV dahil':'KDV hariç';
 function totRows(x,c){const d=x.disc>0.004?`<div class="r"><span>Liste toplamı (KDV hariç)</span><span>${fmt(x.gross,c)}</span></div><div class="r"><span>İskonto</span><span>−${fmt(x.disc,c)}</span></div>`:'';
@@ -535,6 +542,10 @@ function renderPkg(){
     <div class="f"><label for="pk-cur">Para birimi</label><select id="pk-cur" data-pk="cur">${['TRY','EUR','USD'].map(c=>`<option value="${c}" ${(k.cur||'TRY')===c?'selected':''}>${CURN[c]}</option>`).join('')}</select></div>
     <div class="f w2"><label for="pk-desc">Açıklama (isteğe bağlı)</label><input id="pk-desc" data-pk="desc" value="${esc(k.desc)}" placeholder="Ör. 6 metreye kadar baca hattı, ısı odası yalıtımı dahil"></div>
    </div>
+   <h3 style="margin:14px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Teklife eklenecek uygulama resimleri (${(k.imgs||[]).length} seçili)</h3>
+   <div class="pimgs">${[...PKGIMGS,...(k.cimgs||[]).map((u,n)=>({src:u,label:'Kendi resminiz '+(n+1),own:true}))].map(g=>{const on=(k.imgs||[]).includes(g.src);return `<label class="pimg ${on?'on':''}"><input type="checkbox" data-pimg="${esc(g.src)}" ${on?'checked':''}><img src="${esc(g.src)}" alt=""><span>${esc(g.label)}</span>${g.own?`<button type="button" class="imgbtn" data-rmpimg="${esc(g.src)}">Kaldır</button>`:''}</label>`}).join('')}
+    <label class="pimg add"><input type="file" accept="image/*" data-addpimg="1" hidden><span style="font-size:22px;line-height:1">+</span><span>Bilgisayardan resim ekle</span></label></div>
+   <p class="note" style="margin:6px 0 0">Seçtiğiniz resimler PDF'te "Montaj uygulaması" sayfasında, paketin açıklamasıyla birlikte görünür.</p>
    <h3 style="margin:14px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Pakete dahil malzemeler (${n} seçili)</h3>
    <div style="display:grid;gap:6px">${mats.map(p=>{const m=(k.mats||{})[p.code];return `<div class="pm ${m?'on':''}" data-mc="${esc(p.code)}">
      <input type="checkbox" data-m="sel" ${m?'checked':''} aria-label="${esc(p.name)}">
@@ -645,7 +656,14 @@ $('#pn-baca').addEventListener('input',e=>{const t=e.target,row=t.closest('[data
 });
 $('#pn-baca').addEventListener('click',e=>{if(e.target.id!=='stdnotes')return;const cur=(Q.terms.notes||'').split('\n').map(x=>x.trim());const add=STDNOTES.filter(n=>!cur.includes(n)&&!cur.includes('- '+n));
   Q.terms.notes=[Q.terms.notes,...add.map(n=>'- '+n)].filter(Boolean).join('\n');$('#t-notes').value=Q.terms.notes;saveDraft();toast(add.length?add.length+' not eklendi':'Notlar zaten ekli')});
+$('#pn-pkg').addEventListener('change',async e=>{const t=e.target,k=Q.pkg;if(!t.matches('[data-addpimg]'))return;const f=t.files[0];if(!f)return;
+  try{toast('Resim yükleniyor…',1500);const blob=await shrinkImg(f);let url;
+    if(assets){url=(await assets.upload(blob,{type:'image/jpeg'})).url}else{url=await blobToDataURL(await shrinkImg(f,800,0.75))}
+    k.cimgs=[...(k.cimgs||[]),url];k.imgs=[...(k.imgs||[]),url];k.on=true;saveDraft();renderPkg();toast('Resim eklendi')}catch(err){toast('Resim eklenemedi: '+(err?.message||err?.code||'bilinmeyen hata'),4000)}});
+$('#pn-pkg').addEventListener('click',e=>{const b=e.target.closest('[data-rmpimg]');if(!b)return;e.preventDefault();const k=Q.pkg,u=b.dataset.rmpimg;
+  k.cimgs=(k.cimgs||[]).filter(x=>x!==u);k.imgs=(k.imgs||[]).filter(x=>x!==u);saveDraft();renderPkg()});
 $('#pn-pkg').addEventListener('input',e=>{const t=e.target,k=Q.pkg;
+  if(t.dataset.pimg){const u=t.dataset.pimg;k.imgs=(k.imgs||[]).filter(x=>x!==u);if(t.checked){k.imgs.push(u);k.on=true}saveDraft();renderPkg();return}
   if(t.dataset.pk){k[t.dataset.pk]=t.type==='checkbox'?t.checked:t.value;saveDraft();renderTotals();$('#pkgbadge').textContent=k.on?`· ${Number(k.net)?fmt(Number(k.net),k.cur):'fiyat yok'}`:'';if(t.type==='checkbox')renderPkg();return}
   if(t.dataset.pkp){k.net=fromP(Number(t.value)||0,k);saveDraft();renderTotals();return}
   if(t.dataset.pkv){k.vat=t.value;saveDraft();renderPkg();renderTotals();bindVat();return}
@@ -719,6 +737,12 @@ function custHTML(){const c=Q.customer;return `<div class="d-meta">
      <div>${[c.contact,c.phone,c.email].filter(Boolean).map(esc).join(' · ')}</div>${c.project?`<div style="color:#5d5452">Proje: ${esc(c.project)}</div>`:''}</div>
    <div class="d-box"><div class="lb">Teklifi hazırlayan</div><div class="nm">${esc(Q.by||S.by)}</div><div>${esc(Q.by?Q.byph:S.byph)}</div><div>${esc(S.mail)}</div></div></div>
 `}
+function pkgPageHTML(no){const k=Q.pkg,ims=(k.imgs||[]).slice(0,4);const lab=u=>(PKGIMGS.find(g=>g.src===u)||{}).label||'';
+  const h=ims.length===1?620:ims.length===2?400:300,cols=ims.length===1?1:2;
+  return `${miniHead(no,'Montaj uygulaması')}
+  <div><div class="p-sub">${esc((k.svc||[]).join(' · ')||'Montaj')}</div><div class="p-name">${esc(k.title||svcTitle())}</div>
+   ${k.desc?`<div class="p-desc">${esc(k.desc)}</div>`:''}<div class="p-desc" style="color:#5d5452">Aşağıdaki görseller, şöminenizin ısı odası ve kaplama uygulamasının nasıl yapılacağını göstermektedir.</div></div>
+  <div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:14px">${ims.map(u=>`<figure style="margin:0;display:flex;flex-direction:column;gap:6px"><div class="p-img" style="height:${h}px"><img src="${esc(u)}" alt=""></div>${lab(u)?`<figcaption style="font-size:10.5px;color:#5d5452;text-align:center">${esc(lab(u))}</figcaption>`:''}</figure>`).join('')}</div>`}
 function monCard(i){const p=PIDX[i.code];const img=i.cimg||itemImg(i);
   const specs=p.specs.filter(x=>!['Seri','Model','Kullanım'].includes(x[0])).slice(0,4);
   return `<div class="m-card"><div class="m-img">${img?`<img src="${esc(img)}" alt="">`:''}</div><div class="m-bd">
@@ -773,6 +797,7 @@ async function buildPages(){
       const d=newPage(detailPageHTML(i,no));
       if(!fits(d)){d.querySelectorAll('.p-specs .r').forEach((r,k,a)=>{if(k>=a.length-6)r.remove()})}
     }
+    if(Q.pkg?.on&&(Q.pkg.imgs||[]).length)newPage(pkgPageHTML(no));
     if(Q.pkg?.on)Object.entries(Q.pkg.mats||{}).forEach(([c,m])=>{const p=PIDX[c];if(!p)return;const v=p.variants?.find(x=>x.v===m.variant);
       mon.push({code:c,variant:m.variant||'',varLabel:p.varLabel,qty:Number(m.qty)||0,unit:p.unit||'adet',img:v?.img||p.img,inPkg:true})});
     for(let k=0;k<mon.length;k+=6){newPage(miniHead(no,'Montaj malzemeleri')+`<div class="m-grid">${mon.slice(k,k+6).map(monCard).join('')}</div>`)}
