@@ -473,7 +473,7 @@ function addItem(code,vi){
   saveDraft();renderItems();renderGrid();toast(p.name+' eklendi');
 }
 const MONCAT='Baca ve Montaj Ekipmanları';
-const PKGIMGS=[{src:'img/montaj/duz-camli.jpg',label:'Düz camlı hazne – A1 yanmaz levha ısı odası'},{src:'img/montaj/kose-camli.jpg',label:'Köşe camlı hazne – A1 yanmaz levha ısı odası'}];
+const PKGIMGS=[{src:'img/montaj/duz-camli.jpg',label:'Düz camlı hazne – A1 yanmaz levha ısı odası'},{src:'img/montaj/kose-camli.jpg',label:'Köşe camlı hazne – A1 yanmaz levha ısı odası'},{src:'img/montaj/kose-camli-bitmis.jpg',label:'Köşe camlı hazne – bitmiş ısı odası, alt ve üst menfezli'}];
 const VR=()=>1+S.vat/100, incl=i=>(i?.vat||'excl')==='incl', NOVAT=()=>Q.opts.addVat===false&&!ALL().some(incl);
 const showP=(n,i)=>incl(i)?n*VR():n, fromP=(v,i)=>incl(i)?v/VR():v, modeLbl=i=>incl(i)?'KDV dahil':'KDV hariç';
 function totRows(x,c){const d=x.disc>0.004?`<div class="r"><span>Liste toplamı (KDV hariç)</span><span>${fmt(x.gross,c)}</span></div><div class="r"><span>İskonto</span><span>−${fmt(x.disc,c)}</span></div>`:'';
