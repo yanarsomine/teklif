@@ -5,12 +5,13 @@ Ana dalda (`main`) yapılan her değişiklik GitHub Pages ile birkaç dakikada c
 
 ## Dosyalar
 - `index.html` — programın tamamı (arayüz, teklif hesapları, PDF üretimi). Tek dosya, kütüphane: html2canvas + jsPDF (CDN).
-- `backend.js` — `window.claude.use('db'|'assets'|'downloads'|'user')` arayüzünü Supabase ile sağlar. Uygulama kodu bu arayüzle yazılmıştır; arayüzü değiştirme.
+- `backend.js` — `window.claude.use('db'|'assets'|'downloads'|'user'|'archive')` arayüzünü Supabase ile sağlar. Uygulama kodu bu arayüzle yazılmıştır; arayüzü değiştirme.
 - `config.js` — Supabase URL ve anon anahtar (herkese açık olabilir; veriler RLS ile korunur).
 - `data/products.json` — katalog (ürün kodu, ad, kategori, fiyat, para birimi, birim, açıklama, teknik özellikler, varyantlar, resim/çizim yolu). `made: true` = kendi üretimimiz (mermer şömine/barbekü, fiyat teklifte yazılır).
 - `data/thumbs.json` — liste için küçük resimler (data URI), anahtar ürün kodu.
 - `img/`, `img/m/` (mermer kataloğu), `drw/` (teknik çizimler), `logo.png`.
 - `supabase/kurulum.sql` — veritabanı şeması ve güvenlik kuralları.
+- `yedek/` — gün sonu yedeği (Windows): `KURULUM.bat` giriş bilgisini DPAPI ile şifreler, Görev Zamanlayıcı'ya her gün 18:00 görevi kurar; `yedek.ps1` teklif verisini (JSON + CSV) ve gizli `teklifler` kovasındaki PDF'leri `Yedekler\` klasörüne indirir. Teklif kaydedilince/PDF indirilince PDF `teklifler/<id>.pdf` olarak arşivlenir (`archive.savePdf`).
 - `.github/workflows/kur.yml` — hafta içi 09:43 ve 15:43'te TCMB döviz satış kurunu `docs(counter/rate)` satırına yazar (secrets: SUPABASE_URL, SUPABASE_SERVICE_KEY).
 
 ## Veri (Supabase `docs` tablosu: collection, id, data jsonb)

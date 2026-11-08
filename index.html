@@ -414,7 +414,7 @@ const DEFAULT_SETTINGS={
 };
 let S={...DEFAULT_SETTINGS};
 let BASE=[], THUMBS={}, OVR={}, CUSTOM={}, QUOTES=[], P=[], PIDX={};
-let db=null, assets=null, downloads=null, CANEDIT=true, ROLEKNOWN=false, NEXTNO=0;
+let db=null, assets=null, downloads=null, archive=null, CANEDIT=true, ROLEKNOWN=false, NEXTNO=0;
 let Q=null; // current quote
 let cat='Tümü', sub=null;
 
@@ -847,20 +847,36 @@ async function openPreview(){
   m.querySelector('#mpdf').onclick=()=>{m.remove();makePDF()};
 }
 let busy=false;
+async function renderPdfBlob(){
+  const {pages,no}=await buildPages();
+  const pdf=new jspdf.jsPDF({unit:'mm',format:'a4',compress:true});
+  for(let k=0;k<pages.length;k++){
+    const cv=await html2canvas(pages[k],{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,width:794,height:1123,windowWidth:794});
+    if(k)pdf.addPage();
+    pdf.addImage(cv.toDataURL('image/jpeg',0.86),'JPEG',0,0,210,297,undefined,'FAST');
+  }
+  return {blob:pdf.output('blob'),no};
+}
+async function archivePdf(blob){
+  if(!archive||!Q.id)return;
+  try{await archive.savePdf(Q.id,blob)}catch(e){console.warn('PDF arşivlenemedi',e)}
+}
+let archTimer=null;
+function scheduleArchive(){
+  clearTimeout(archTimer);
+  archTimer=setTimeout(async()=>{
+    if(busy||!archive||!Q.id||!window.jspdf||!window.html2canvas)return;
+    busy=true;try{const {blob}=await renderPdfBlob();await archivePdf(blob)}catch(e){console.warn(e)}finally{busy=false}
+  },1500);
+}
 async function makePDF(){
   if(busy)return;if(!ALL().length){toast('Önce teklife ürün ekleyin');return}
   if(!window.jspdf||!window.html2canvas){toast('PDF araçları yüklenemedi, sayfayı yenileyin');return}
   busy=true;$('#pdf').disabled=true;$('#pdf').textContent='PDF hazırlanıyor…';
   try{
-    if(!Q.id)await saveQuote(true);
-    const {pages,no}=await buildPages();
-    const pdf=new jspdf.jsPDF({unit:'mm',format:'a4',compress:true});
-    for(let k=0;k<pages.length;k++){
-      const cv=await html2canvas(pages[k],{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,width:794,height:1123,windowWidth:794});
-      if(k)pdf.addPage();
-      pdf.addImage(cv.toDataURL('image/jpeg',0.86),'JPEG',0,0,210,297,undefined,'FAST');
-    }
-    const blob=pdf.output('blob');
+    if(!Q.id)await saveQuote(true,true);
+    const {blob,no}=await renderPdfBlob();
+    archivePdf(blob);
     const nm=('Yanar Somine Teklif '+no+(Q.customer.name?' - '+Q.customer.name:'')).replace(/[\\/:*?"<>|]/g,'')+'.pdf';
     if(!downloads){toast('Bu görünümde dosya indirilemiyor. Sayfayı claude.ai üzerinden açın.',5000);return}
     try{await downloads.save({filename:nm,data:blob});toast('PDF kaydedildi')}
@@ -871,7 +887,7 @@ async function makePDF(){
 $('#preview').onclick=openPreview;$('#pdf').onclick=makePDF;
 
 /* ---------- persistence ---------- */
-async function saveQuote(silent){
+async function saveQuote(silent,noArchive){
   if(!ALL().length){toast('Boş teklif kaydedilmez');return}
   if(!Q.id){
     let n=Number(S.next)||1;
@@ -883,7 +899,7 @@ async function saveQuote(silent){
   const doc={...Q,totals:Object.fromEntries(Object.entries(t).map(([c,x])=>[c,+x.total.toFixed(2)])),updatedAt:new Date().toISOString()};
   saveDraft();bindQuoteFields();
   if(!db){if(!silent)toast('Kayıt servisi kullanılamıyor; teklif bu tarayıcıda taslak olarak duruyor',4000);return}
-  try{await db.doc('quotes/'+Q.id).set(JSON.parse(JSON.stringify(doc)));if(!silent)toast('Teklif '+Q.no+' kaydedildi')}
+  try{await db.doc('quotes/'+Q.id).set(JSON.parse(JSON.stringify(doc)));if(!silent)toast('Teklif '+Q.no+' kaydedildi');if(!noArchive)scheduleArchive()}
   catch(e){toast('Kaydedilemedi: '+(e?.message||e?.code),4000)}
 }
 $('#save').onclick=()=>saveQuote(false);
@@ -1053,7 +1069,7 @@ async function boot(){
 async function connect(){
   if(!window.claude?.use){$('#status').textContent=P.length+' ürün · kayıt kapalı';return}
   const timer=setTimeout(()=>{if(!db)$('#status').textContent=P.length+' ürün · kayıt servisine bağlanılamadı'},10000);
-  claude.use('downloads').then(d=>downloads=d).catch(()=>{});
+  claude.use('downloads').then(d=>downloads=d).catch(()=>{});claude.use('archive').then(a=>archive=a).catch(()=>{});
   claude.use('assets').then(a=>assets=a).catch(()=>{});
   try{db=await claude.use('db')}catch(e){db=null}
   try{const u=await claude.use('user');CANEDIT=u?await u.canEdit():false}catch(e){CANEDIT=false}

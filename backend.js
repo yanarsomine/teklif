@@ -113,6 +113,15 @@
     }
   };
 
+  /* ---------- archive (gizli "teklifler" kovasına teklif PDF'i; gün sonu yedeği buradan alır) ---------- */
+  const archive = {
+    async savePdf(id, blob) {
+      const { error } = await sb.storage.from('teklifler').upload(`${id}.pdf`, blob, { contentType: 'application/pdf', upsert: true });
+      if (error) throw fail(error);
+      return true;
+    }
+  };
+
   /* ---------- downloads (normal browser download) ---------- */
   const downloads = {
     async save({ filename, data }) {
@@ -135,7 +144,7 @@
     async use(name) {
       if (!sb) return null;
       await authed;
-      return { db, assets, downloads, user }[name] || null;
+      return { db, assets, downloads, user, archive }[name] || null;
     }
   };
 

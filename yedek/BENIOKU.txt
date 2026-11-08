@@ -1,0 +1,24 @@
+﻿YANAR ŞÖMİNE – TEKLİF YEDEĞİ
+================================
+
+Bu klasör, teklif programındaki tüm teklifleri her gün 18:00'de bu bilgisayara yedekler.
+
+KURULUM (bir kez)
+1. Bu klasörü kalıcı bir yere koyun, örneğin  C:\YanarYedek
+2. KURULUM.bat dosyasına çift tıklayın.
+3. Açılan pencereye teklif programına giriş yaptığınız e-posta ve şifreyi yazın.
+   (Şifre bu bilgisayarda şifreli saklanır, başka yere gönderilmez.)
+4. İlk yedek alınır ve "Yedekler" klasörü açılır.
+
+YEDEKLER KLASÖRÜ
+- PDF\     : Her teklifin PDF'i ("YS-2026-0001 - Müşteri adı.pdf"). Teklif değişince güncellenir.
+- Veri\    : Her günün tarihiyle
+               teklif-listesi-GG.csv  (Excel ile açılır: no, tarih, müşteri, telefon, toplam…)
+               teklifler-GG.json      (tüm teklif bilgileri, gerektiğinde geri yüklemek için)
+- yedek-gunlugu.txt : Her yedeğin sonucu (Tamam / HATA).
+
+NOTLAR
+- Bilgisayar 18:00'de kapalıysa yedek, bilgisayar açıldığında alınır.
+- Hemen yedek almak için SIMDI-YEDEKLE.bat dosyasına çift tıklayın.
+- Program şifrenizi değiştirirseniz KURULUM.bat'ı yeniden çalıştırın.
+- Klasörü taşırsanız KURULUM.bat'ı yeni yerinde yeniden çalıştırın.
