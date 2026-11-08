@@ -1,0 +1,22 @@
+YANAR ŞÖMİNE – TEKLİF YEDEĞİ (Mac)
+==================================
+
+Teklif programındaki tüm teklifleri her gün 18:00'de bu Mac'e yedekler.
+
+KURULUM (bir kez)
+1. Zip'i açın, çıkan klasördeki "Kurulum.command" dosyasına SAĞ TIKLAYIP "Aç" deyin
+   (ilk açılışta Mac "geliştirici doğrulanamadı" diyebilir; sağ tık > Aç ile açılır).
+2. Terminal penceresinde teklif programına giriş yaptığınız e-posta ve şifreyi yazın.
+   Şifre yazarken görünmez; Mac'in Anahtar Zinciri'nde saklanır.
+3. Dosyalar kişisel klasörünüzdeki "YanarYedek" klasörüne kopyalanır, ilk yedek alınır ve
+   "Yedekler" klasörü açılır. Zip'ten çıkan klasörü sonra silebilirsiniz.
+
+YEDEKLER  (~/YanarYedek/Yedekler)
+- PDF/   : Her teklifin PDF'i ("YS-2026-0001 - Müşteri adı.pdf"), teklif değişince güncellenir.
+- Veri/  : Her günün tarihiyle teklif-listesi-GG.csv (Excel/Numbers ile açılır) ve teklifler-GG.json (tam kopya).
+- yedek-gunlugu.txt : Her yedeğin sonucu (Tamam / HATA).
+
+NOTLAR
+- Mac 18:00'de uykudaysa yedek uyanınca, kapalıysa oturum açılınca alınır.
+- Hemen yedek almak için ~/YanarYedek içindeki "Simdi-Yedekle.command" dosyasını açın.
+- Program şifrenizi değiştirirseniz Kurulum.command'ı yeniden çalıştırın.
