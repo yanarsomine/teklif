@@ -709,12 +709,13 @@ $('#newq').onclick=()=>{Q=blankQuote();saveDraft();bindQuoteFields();renderItems
 function footHTML(n,total){return `<div class="d-foot"><div>${esc(S.title)}<br>${esc(S.addr)}</div><div style="text-align:right;white-space:nowrap">Tel ${esc(S.phone)}<br>${esc(S.mail)} · ${esc(S.web)}<br>Sayfa ${n} / ${total}</div></div>`}
 function headHTML(no){return `<div class="d-head"><img src="logo.png" alt=""><div class="ttl"><h1>FİYAT TEKLİFİ</h1><div>Teklif No: <b>${esc(no)}</b></div><div>Tarih: ${trDate(Q.date)} · Geçerlilik: ${trDate(addDays(Q.date,Q.valid))}</div></div></div>`}
 function miniHead(no,title){return `<div class="d-head" style="padding-bottom:10px"><img src="logo.png" alt="" style="height:30px"><div class="ttl"><div class="d-cont">${esc(title)}</div><div>Teklif No: ${esc(no)} · ${trDate(Q.date)}</div></div></div>`}
-function pspecs(p,variant){const v=p?.variants?.find(x=>x.v===variant);if(!v?.specs?.length)return p?.specs||[];const k=new Set(v.specs.map(x=>x[0]));return [...v.specs,...(p.specs||[]).filter(x=>!k.has(x[0])&&x[0]!=='Ölçü seçenekleri')]}
+function pspecs(p,variant,it){if(it)return pspecs(p,variant).map(([k,v])=>[k,String(v).replace('{miktar}',fmtQ(it.qty)+' '+(it.unit||''))]);const v=p?.variants?.find(x=>x.v===variant);if(!v?.specs?.length)return p?.specs||[];const k=new Set(v.specs.map(x=>x[0]));return [...v.specs,...(p.specs||[]).filter(x=>!k.has(x[0])&&x[0]!=='Ölçü seçenekleri')]}
+function fmtQ(q){return (Number(q)||0).toLocaleString('tr-TR',{maximumFractionDigits:2})}
 function specLine(i){const p=PIDX[i.code];const nt=i.note||i.desc;if(nt){const t=nt.trim().replace(/[ \t]+/g,' ');return esc(t.length>520?t.slice(0,t.lastIndexOf(' ',515))+'…':t).replace(/\n/g,'<br>')}if(!p)return '';if(p.made){const t=(p.short||'').split('. ')[0];return esc(t.length>110?t.slice(0,t.lastIndexOf(' ',105))+'…':t)}
   const parts=[];if(i.variant)parts.push((i.varLabel||'Seçenek')+': '+i.variant);
   const pri=[/^(Dış )?[Öö]lçü|^Boyut/,/^Cam tipi/,/[Gg]üç(?! aralığı)|Nominal güç|Anma gücü|Isıtma kapasitesi/,/Isıtma alanı/,/^Yakıt/,/Set içeriği|Kaplama alanı|Çap seçenekleri|Taban|Sıcaklık dayanımı|Malzeme|Uzunluk/];
   const skip=/^(Seri|Model|Garanti|Belge|Kontrol|Elektrik bağlantısı)$/;const used=new Set();
-  const PS=pspecs(p,i.variant);
+  const PS=pspecs(p,i.variant,i);
   for(const re of pri){if(parts.length>=3)break;const s=PS.find(x=>re.test(x[0])&&!used.has(x[0]));if(s){used.add(s[0]);parts.push(s[0].replace(/ \(.*\)/,'')+': '+s[1])}}
   for(const s of PS){if(parts.length>=2)break;if(!skip.test(s[0])&&!used.has(s[0])){used.add(s[0]);parts.push(s[0]+': '+s[1])}}
   return esc(parts.join(' · '))}
@@ -750,7 +751,7 @@ function pkgPageHTML(no){const k=Q.pkg,ims=(k.imgs||[]).slice(0,4);const lab=u=>
    ${k.desc?`<div class="p-desc">${esc(k.desc)}</div>`:''}<div class="p-desc" style="color:#5d5452">Aşağıdaki görseller, şöminenizin ısı odası ve kaplama uygulamasının nasıl yapılacağını göstermektedir.</div></div>
   <div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:14px">${ims.map(u=>`<figure style="margin:0;display:flex;flex-direction:column;gap:6px"><div class="p-img" style="height:${h}px"><img src="${esc(u)}" alt=""></div>${lab(u)?`<figcaption style="font-size:10.5px;color:#5d5452;text-align:center">${esc(lab(u))}</figcaption>`:''}</figure>`).join('')}</div>`}
 function monCard(i){const p=PIDX[i.code];const img=i.cimg||itemImg(i);
-  const specs=pspecs(p,i.variant).filter(x=>!['Seri','Model','Kullanım'].includes(x[0])).slice(0,4);
+  const specs=pspecs(p,i.variant,i).filter(x=>!['Seri','Model','Kullanım'].includes(x[0])).slice(0,4);
   return `<div class="m-card"><div class="m-img">${img?`<img src="${esc(img)}" alt="">`:''}</div><div class="m-bd">
    <div class="m-nm">${esc(i.name||p.name)}</div>${i.note?`<div class="m-v" style="color:#3d3533;font-weight:500">${esc(i.note)}</div>`:''}${i.variant?`<div class="m-v">${esc(i.varLabel||'Seçenek')}: ${esc(i.variant)}</div>`:''}
    ${p.short?`<div class="m-ds">${esc(p.short.length>170?p.short.slice(0,p.short.lastIndexOf(' ',165))+'…':p.short)}</div>`:''}
@@ -762,7 +763,7 @@ function freeDetailHTML(i,no){return `${miniHead(no,'Ürün bilgisi')}
    <div><div class="p-name">${esc(i.name||'—')}</div>${i.note||i.desc?`<div class="p-desc" style="font-size:12.5px">${esc(i.note||i.desc).replace(/\n/g,'<br>')}</div>`:''}
    ${Q.opts.unitp?`<div class="p-qp"><div>Miktar<b>${qtyTxt(i)}</b></div><div>Birim fiyat (${modeLbl(i)})<b>${fmt(unitShow(i),i.cur)}</b></div></div>`:''}</div></div>`}
 function detailPageHTML(i,no){const p=PIDX[i.code];const img=itemImg(i);
-  const specs=pspecs(p,i.variant).filter(x=>!['Seri','Model','Model kodu','Stok kodu'].includes(x[0])).slice(0,18);const half=Math.ceil(specs.length/2);
+  const specs=pspecs(p,i.variant,i).filter(x=>!['Seri','Model','Model kodu','Stok kodu'].includes(x[0])).slice(0,18);const half=Math.ceil(specs.length/2);
   const col=a=>a.map(s=>`<div class="r"><span>${esc(s[0])}</span><span>${esc(s[1])}</span></div>`).join('');
   const showDrw=Q.opts.drw&&p.drw;
   return `${miniHead(no,'Ürün bilgisi')}
