@@ -430,6 +430,7 @@ function buildProducts(){
   arr.forEach(p=>{const o=OVR[p.code];if(!o)return;
     TEXTKEYS.forEach(k=>{if(o[k]!=null)p[k]=Array.isArray(o[k])?o[k].map(x=>Array.isArray(x)?[...x]:(x&&typeof x==='object'?{...x}:x)):o[k]});
     if(o.price!=null&&o.price!=='')p.price=Number(o.price);
+    if(o.price!=null&&o.price!==''&&p.variants?.length)p.variants=p.variants.map(v=>v.price?v:{...v,price:Number(o.price)});
     if(o.vprices&&p.variants)p.variants=p.variants.map(v=>o.vprices[v.v]!=null?{...v,price:Number(o.vprices[v.v])}:v);
     if(o.drw)p.drw=o.drw; if(o.img){p.img=o.img;p.thumb=o.img} if(o.hidden)p.hidden=true;});
   P=arr; PIDX=Object.fromEntries(P.map(p=>[p.code,p]));
