@@ -618,10 +618,12 @@ function fillBy(){const sel=$('#q-by');const l=staffList();
   sel.innerHTML=l.map(x=>`<option ${x.n===Q.by?'selected':''}>${esc(x.n)}</option>`).join('');
   sel.onchange=()=>{const f=l.find(x=>x.n===sel.value);Q.by=f.n;Q.byph=f.p;ls.set('ys-me',f.n);saveDraft()}}
 function xnoteList(){const l=String(S.xnotes||'').split('\n').map(x=>x.trim()).filter(Boolean);(Q.terms.xn||[]).forEach(x=>{if(!l.includes(x))l.push(x)});return l}
-function renderXn(){const sel=Q.terms.xn||[];$('#t-xn').innerHTML=xnoteList().map((t,k)=>`<label class="chk"><input type="checkbox" data-xn="${k}" ${sel.includes(t)?'checked':''}> ${esc(t)}</label>`).join('')||'<span class="note">Ayarlar\'dan not seçeneği ekleyin.</span>';
+function renderXn(){fixNote();const sel=Q.terms.xn||[];$('#t-xn').innerHTML=xnoteList().map((t,k)=>`<label class="chk"><input type="checkbox" data-xn="${k}" ${sel.includes(t)?'checked':''}> ${esc(t)}</label>`).join('')||'<span class="note">Ayarlar\'dan not seçeneği ekleyin.</span>';
   $('#t-xn').onchange=e=>{const l=xnoteList();Q.terms.xn=[...$('#t-xn').querySelectorAll('[data-xn]:checked')].map(c=>l[+c.dataset.xn]);saveDraft()}}
 const OLDNOTE=/Yazılı sipariş teyidinizi bekler,? çalışmalarınızda başarılar dileriz\.?/;
-function fixNote(){if(Q?.terms&&OLDNOTE.test(Q.terms.notes||''))Q.terms.notes=Q.terms.notes.replace(OLDNOTE,DEFAULT_SETTINGS.notes)}
+const XNFIX={'Alçı, sıva ve boya işleri fiyata dahil değildir.':'Alçı, sıva ve boya işleri firmamıza ait değildir.','Çatı bacası çevresindeki su yalıtımı fiyata dahil değildir.':'Çatı bacası çevresindeki su yalıtımı firmamıza ait değildir.'};
+function fixNote(){if(!Q?.terms)return;if(OLDNOTE.test(Q.terms.notes||''))Q.terms.notes=Q.terms.notes.replace(OLDNOTE,DEFAULT_SETTINGS.notes);
+  if(Q.terms.xn)Q.terms.xn=[...new Set(Q.terms.xn.map(x=>XNFIX[x]||x))]}
 function bindQuoteFields(){fixNote();renderXn();fillBy();if(!$('#pn-pkg').hidden)renderPkg();else{const k=Q.pkg;$('#pkgbadge').textContent=k&&k.on?`· ${Number(k.net)?fmt(Number(k.net),k.cur):'fiyat yok'}`:''}
   const map={'c-name':['customer','name'],'c-contact':['customer','contact'],'c-phone':['customer','phone'],'c-email':['customer','email'],'c-project':['customer','project'],
    't-pay':['terms','pay'],'t-del':['terms','del'],'t-ins':['terms','ins'],'t-war':['terms','war'],'t-notes':['terms','notes']};
