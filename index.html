@@ -725,8 +725,8 @@ function pspecs(p,variant,it){if(it)return pspecs(p,variant).map(([k,v])=>[k,Str
 function fmtQ(q){return (Number(q)||0).toLocaleString('tr-TR',{maximumFractionDigits:2})}
 function specLine(i){const p=PIDX[i.code];const nt=i.note||i.desc;if(nt){const t=nt.trim().replace(/[ \t]+/g,' ');return esc(t.length>520?t.slice(0,t.lastIndexOf(' ',515))+'…':t).replace(/\n/g,'<br>')}if(!p)return '';if(p.made){const t=(p.short||'').split('. ')[0];return esc(t.length>110?t.slice(0,t.lastIndexOf(' ',105))+'…':t)}
   const parts=[];if(i.variant)parts.push((i.varLabel||'Seçenek')+': '+i.variant);
-  const pri=[/^(Dış )?[Öö]lçü|^Boyut/,/^Cam tipi/,/[Gg]üç(?! aralığı)|Nominal güç|Anma gücü|Isıtma kapasitesi/,/Isıtma alanı/,/^Yakıt/,/Set içeriği|Kaplama alanı|Çap seçenekleri|Taban|Sıcaklık dayanımı|Malzeme|Uzunluk/];
-  const skip=/^(Seri|Model|Garanti|Belge|Kontrol|Elektrik bağlantısı)$/;const used=new Set();
+  const pri=[/^(Dış )?[Öö]lçü|^Boyut/,/^Cam tipi/,/[Gg]üç(?! aralığı)|Nominal güç|Anma gücü|Isıtma kapasitesi/,/Isıtma alanı/,/^Yakıt/,/Set içeriği|Kaplama alanı|Çap seçenekleri|Taban|Sıcaklık dayanımı|Malzeme|Uzunluk|^İç cidar|^Boy$/];
+  const skip=/^(Seri|Model|Garanti|Belge|Kontrol|Elektrik bağlantısı)$/;const used=new Set(i.variant?[i.varLabel||'Seçenek']:[]);
   const PS=pspecs(p,i.variant,i);
   for(const re of pri){if(parts.length>=3)break;const s=PS.find(x=>re.test(x[0])&&!used.has(x[0]));if(s){used.add(s[0]);parts.push(s[0].replace(/ \(.*\)/,'')+': '+s[1])}}
   for(const s of PS){if(parts.length>=2)break;if(!skip.test(s[0])&&!used.has(s[0])){used.add(s[0]);parts.push(s[0]+': '+s[1])}}
