@@ -620,7 +620,9 @@ function fillBy(){const sel=$('#q-by');const l=staffList();
 function xnoteList(){const l=String(S.xnotes||'').split('\n').map(x=>x.trim()).filter(Boolean);(Q.terms.xn||[]).forEach(x=>{if(!l.includes(x))l.push(x)});return l}
 function renderXn(){const sel=Q.terms.xn||[];$('#t-xn').innerHTML=xnoteList().map((t,k)=>`<label class="chk"><input type="checkbox" data-xn="${k}" ${sel.includes(t)?'checked':''}> ${esc(t)}</label>`).join('')||'<span class="note">Ayarlar\'dan not seçeneği ekleyin.</span>';
   $('#t-xn').onchange=e=>{const l=xnoteList();Q.terms.xn=[...$('#t-xn').querySelectorAll('[data-xn]:checked')].map(c=>l[+c.dataset.xn]);saveDraft()}}
-function bindQuoteFields(){renderXn();fillBy();if(!$('#pn-pkg').hidden)renderPkg();else{const k=Q.pkg;$('#pkgbadge').textContent=k&&k.on?`· ${Number(k.net)?fmt(Number(k.net),k.cur):'fiyat yok'}`:''}
+const OLDNOTE=/Yazılı sipariş teyidinizi bekler,? çalışmalarınızda başarılar dileriz\.?/;
+function fixNote(){if(Q?.terms&&OLDNOTE.test(Q.terms.notes||''))Q.terms.notes=Q.terms.notes.replace(OLDNOTE,DEFAULT_SETTINGS.notes)}
+function bindQuoteFields(){fixNote();renderXn();fillBy();if(!$('#pn-pkg').hidden)renderPkg();else{const k=Q.pkg;$('#pkgbadge').textContent=k&&k.on?`· ${Number(k.net)?fmt(Number(k.net),k.cur):'fiyat yok'}`:''}
   const map={'c-name':['customer','name'],'c-contact':['customer','contact'],'c-phone':['customer','phone'],'c-email':['customer','email'],'c-project':['customer','project'],
    't-pay':['terms','pay'],'t-del':['terms','del'],'t-ins':['terms','ins'],'t-war':['terms','war'],'t-notes':['terms','notes']};
   Object.entries(map).forEach(([id,[a,b]])=>{const el=$('#'+id);el.value=Q[a][b]||'';el.oninput=()=>{Q[a][b]=el.value;saveDraft()}});
@@ -739,7 +741,7 @@ function totalsHTML(){const t=totals();return `<div class="d-tots">${Object.keys
   <div class="r h"><span>${CURN[c]}</span><span></span></div>
   ${totRows(x,c)}
  </div>`}).join('')}</div>${tlDoc()}${fxNote()}`}
-function termsHTML(){const T=Q.terms;const sv=Q.pkg?.on?(Q.pkg.svc||[]):[];
+function termsHTML(){fixNote();const T=Q.terms;const sv=Q.pkg?.on?(Q.pkg.svc||[]):[];
   const ins=(sv.length&&(!T.ins||T.ins===S.ins))?sv.join(', ').replace(/, ([^,]*)$/,' ve $1')+' paket fiyata dahildir':T.ins;
   const r=[['Ödeme şekli',T.pay],['Teslim süresi',T.del],['Montaj',ins],['Garanti',T.war]].filter(x=>x[1]);
   return `<div class="d-terms">${NOVAT()?`<div class="w" style="font-weight:700;color:#9a1b1f">Fiyatlarımıza KDV dahil değildir.</div>`:''}${r.map(x=>`<div><b>${x[0]}</b>${esc(x[1])}</div>`).join('')}
