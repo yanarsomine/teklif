@@ -411,7 +411,7 @@ const DEFAULT_SETTINGS={
   tryIncl:true, eurIncl:true,
   pay:'Siparişte %50 peşin, kalanı teslimatta', del:'Sipariş onayından itibaren 15 iş günü', ins:'Montaj fiyata dahil değildir', war:'2 yıl',
   staff:'',
-  xnotes:'Alçı, sıva ve boya işleri fiyata dahil değildir.\nÇatı bacası çevresindeki su yalıtımı fiyata dahil değildir.\nÇalışma sırasında çıkan atıklar çuvallanarak yerinde bırakılacaktır.\nKeşif sonrasında fiyatlarda değişiklik olabilir.',
+  xnotes:'Alçı, sıva ve boya işleri firmamıza ait değildir.\nÇatı bacası çevresindeki su yalıtımı firmamıza ait değildir.\nÇalışma sırasında çıkan atıklar çuvallanarak yerinde bırakılacaktır.\nKeşif sonrasında fiyatlarda değişiklik olabilir.',
   thanks:'Sayın {musteri},\n\nYanar Şömine\'ye göstermiş olduğunuz ilgi ve güven için teşekkür ederiz. {proje} için talebiniz doğrultusunda hazırladığımız teklifimizi bilgilerinize sunarız.\n\nTeklifimizde seçtiğiniz ürünlerin teknik özelliklerini ve çizimlerini, son bölümde ise fiyat ve koşulları bulabilirsiniz. Ürün seçiminden montaja kadar her konuda sorularınızı yanıtlamaktan memnuniyet duyarız.\n\nSaygılarımızla,',
   about:'Yanar Şömine olarak 1986\'dan beri evlere sıcaklık taşıyoruz. Konut ve ticari mekânlar için odunlu, doğalgazlı ve elektrikli şömine projelerinde uzmanlaşmış bir şömine proje ve uygulama firmasıyız. Ürün seçiminden baca ve montaja kadar tüm süreçte yanınızdayız.',
   notes:'Siparişiniz, yazılı onayınızın ardından kesinleşir. Sorularınız için bizimle dilediğiniz zaman iletişime geçebilirsiniz. Teklifimizi değerlendirdiğiniz için teşekkür ederiz.'
@@ -1088,7 +1088,7 @@ async function connect(){
   $('#status').textContent=P.length+' ürün · kayıtlar bağlı';
   db.doc('counter/rate').onSnapshot(s=>{RATE=s.exists?s.data():null;if(RATE&&Number(RATE.eur)>0)applyRate(false);else rateNote()},()=>{});
   db.doc('counter/quotes').onSnapshot(s=>{NEXTNO=s.exists?Number(s.data().next)||0:0},()=>{});
-  db.doc('config/settings').onSnapshot(s=>{if(s.exists){S={...DEFAULT_SETTINGS,...s.data()};if(/Ltd\.? ?Şti/i.test(S.title||''))S.title='Yanar Şömine';if(/başarılar dileriz/.test(S.notes||''))S.notes=DEFAULT_SETTINGS.notes;renderItems();if(!$('#v-ayarlar').hidden)fillSettings()}},()=>{});
+  db.doc('config/settings').onSnapshot(s=>{if(s.exists){S={...DEFAULT_SETTINGS,...s.data()};if(/Ltd\.? ?Şti/i.test(S.title||''))S.title='Yanar Şömine';if(/başarılar dileriz/.test(S.notes||''))S.notes=DEFAULT_SETTINGS.notes;S.xnotes=String(S.xnotes||'').replace('Alçı, sıva ve boya işleri fiyata dahil değildir.','Alçı, sıva ve boya işleri firmamıza ait değildir.').replace('Çatı bacası çevresindeki su yalıtımı fiyata dahil değildir.','Çatı bacası çevresindeki su yalıtımı firmamıza ait değildir.');renderItems();if(!$('#v-ayarlar').hidden)fillSettings()}},()=>{});
   db.collection('overrides').onSnapshot(s=>{OVR={};s.docs.forEach(d=>{const x=d.data();OVR[x.code]=x});buildProducts();renderCats();renderGrid();renderItems();if(!$('#v-urunler').hidden&&!document.activeElement?.closest('#plist'))renderPAdmin()},()=>{});
   db.collection('custom').onSnapshot(s=>{CUSTOM={};s.docs.forEach(d=>{const x=d.data();CUSTOM[x.code]=x});buildProducts();renderCats();renderGrid();if(!$('#v-urunler').hidden)renderPAdmin();$('#status').textContent=P.length+' ürün · kayıtlar bağlı'},()=>{});
   db.collection('quotes').onSnapshot(s=>{QUOTES=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));renderSaved()},()=>{$('#snote').textContent='Kayıtlı teklifler okunamadı.'});
