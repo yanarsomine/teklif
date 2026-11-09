@@ -60,6 +60,7 @@ button{cursor:pointer}
 .chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 10px;font-size:12.5px;color:var(--muted)}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
 .subchips .chip{font-size:12px;padding:3px 9px}
+.xn{display:flex;flex-direction:column;gap:6px;padding:4px 0}.xn .chk{display:flex;align-items:flex-start;justify-content:flex-start;gap:8px;text-align:left;font-weight:400;font-size:14px;color:inherit;text-transform:none;letter-spacing:0;margin:0}.xn .chk input{width:auto;flex:none;margin-top:3px}
 .list tr.pgrp td{background:var(--bg);font-weight:700;font-size:13px;padding:10px 10px 6px;border-top:2px solid var(--line)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;padding:12px 14px;max-height:calc(100vh - 230px);overflow:auto}
 @media (max-width:980px){.grid{max-height:none}}
@@ -298,6 +299,7 @@ table.d-t tr.cur td{background:#f7f2f0;font-weight:700;font-size:10px;letter-spa
           <div class="f"><label for="t-del">Teslim süresi</label><input id="t-del"></div>
           <div class="f"><label for="t-ins">Montaj</label><input id="t-ins"></div>
           <div class="f"><label for="t-war">Garanti</label><input id="t-war"></div>
+          <div class="f w2"><label>Teklif notu <span class="note">(teklife eklemek istediklerinizi işaretleyin)</span></label><div id="t-xn" class="xn"></div></div>
           <div class="f w2"><label for="t-notes">Not</label><textarea id="t-notes"></textarea></div>
         </div>
       </div>
@@ -379,6 +381,7 @@ table.d-t tr.cur td{background:#f7f2f0;font-weight:700;font-size:10px;letter-spa
         <div class="f"><label for="s-war">Garanti</label><input id="s-war"></div>
         <div class="f w2"><label for="s-thanks">Teşekkür yazısı (ilk sayfa; {musteri} ve {proje} otomatik doldurulur)</label><textarea id="s-thanks" rows="7"></textarea></div>
         <div class="f w2"><label for="s-about">Firma tanıtım metni (ilk sayfa)</label><textarea id="s-about" rows="4"></textarea></div>
+        <div class="f w2"><label for="s-xnotes">Teklif notu seçenekleri (her satıra bir not; teklif hazırlarken işaretlenerek eklenir)</label><textarea id="s-xnotes" rows="5"></textarea></div>
         <div class="f w2"><label for="s-notes">Varsayılan not</label><textarea id="s-notes"></textarea></div>
       </div></div>
     <div class="actions"><button class="btn pri" id="ssave">Ayarları kaydet</button><span class="note" id="snote2"></span></div>
@@ -408,6 +411,7 @@ const DEFAULT_SETTINGS={
   tryIncl:true, eurIncl:true,
   pay:'Siparişte %50 peşin, kalanı teslimatta', del:'Sipariş onayından itibaren 15 iş günü', ins:'Montaj fiyata dahil değildir', war:'2 yıl',
   staff:'',
+  xnotes:'Alçı, sıva ve boya işleri fiyata dahil değildir.\nÇatı bacası çevresindeki su yalıtımı fiyata dahil değildir.\nÇalışma sırasında çıkan atıklar çuvallanarak yerinde bırakılacaktır.\nKeşif sonrasında fiyatlarda değişiklik olabilir.',
   thanks:'Sayın {musteri},\n\nYanar Şömine\'ye göstermiş olduğunuz ilgi ve güven için teşekkür ederiz. {proje} için talebiniz doğrultusunda hazırladığımız teklifimizi bilgilerinize sunarız.\n\nTeklifimizde seçtiğiniz ürünlerin teknik özelliklerini ve çizimlerini, son bölümde ise fiyat ve koşulları bulabilirsiniz. Ürün seçiminden montaja kadar her konuda sorularınızı yanıtlamaktan memnuniyet duyarız.\n\nSaygılarımızla,',
   about:'Yanar Şömine olarak 1986\'dan beri evlere sıcaklık taşıyoruz. Konut ve ticari mekânlar için odunlu, doğalgazlı ve elektrikli şömine projelerinde uzmanlaşmış bir şömine proje ve uygulama firmasıyız. Ürün seçiminden baca ve montaja kadar tüm süreçte yanınızdayız.',
   notes:'Siparişiniz, yazılı onayınızın ardından kesinleşir. Sorularınız için bizimle dilediğiniz zaman iletişime geçebilirsiniz. Teklifimizi değerlendirdiğiniz için teşekkür ederiz.'
@@ -464,7 +468,7 @@ function renderGrid(){
 /* ---------- quote ---------- */
 function blankQuote(){
   return {id:null,no:'',date:today(),valid:15,customer:{name:'',contact:'',phone:'',email:'',project:''},items:[],
-    terms:{pay:S.pay,del:S.del,ins:S.ins,war:S.war,notes:S.notes},
+    terms:{pay:S.pay,del:S.del,ins:S.ins,war:S.war,notes:S.notes,xn:[]},
     opts:{details:true,drw:true,img:true,unitp:false,vat:'excl'}};
 }
 function addItem(code,vi){
@@ -613,7 +617,10 @@ function fillBy(){const sel=$('#q-by');const l=staffList();
   if(!l.some(x=>x.n===Q.by))l.push({n:Q.by,p:Q.byph||''});
   sel.innerHTML=l.map(x=>`<option ${x.n===Q.by?'selected':''}>${esc(x.n)}</option>`).join('');
   sel.onchange=()=>{const f=l.find(x=>x.n===sel.value);Q.by=f.n;Q.byph=f.p;ls.set('ys-me',f.n);saveDraft()}}
-function bindQuoteFields(){fillBy();if(!$('#pn-pkg').hidden)renderPkg();else{const k=Q.pkg;$('#pkgbadge').textContent=k&&k.on?`· ${Number(k.net)?fmt(Number(k.net),k.cur):'fiyat yok'}`:''}
+function xnoteList(){const l=String(S.xnotes||'').split('\n').map(x=>x.trim()).filter(Boolean);(Q.terms.xn||[]).forEach(x=>{if(!l.includes(x))l.push(x)});return l}
+function renderXn(){const sel=Q.terms.xn||[];$('#t-xn').innerHTML=xnoteList().map((t,k)=>`<label class="chk"><input type="checkbox" data-xn="${k}" ${sel.includes(t)?'checked':''}> ${esc(t)}</label>`).join('')||'<span class="note">Ayarlar\'dan not seçeneği ekleyin.</span>';
+  $('#t-xn').onchange=e=>{const l=xnoteList();Q.terms.xn=[...$('#t-xn').querySelectorAll('[data-xn]:checked')].map(c=>l[+c.dataset.xn]);saveDraft()}}
+function bindQuoteFields(){renderXn();fillBy();if(!$('#pn-pkg').hidden)renderPkg();else{const k=Q.pkg;$('#pkgbadge').textContent=k&&k.on?`· ${Number(k.net)?fmt(Number(k.net),k.cur):'fiyat yok'}`:''}
   const map={'c-name':['customer','name'],'c-contact':['customer','contact'],'c-phone':['customer','phone'],'c-email':['customer','email'],'c-project':['customer','project'],
    't-pay':['terms','pay'],'t-del':['terms','del'],'t-ins':['terms','ins'],'t-war':['terms','war'],'t-notes':['terms','notes']};
   Object.entries(map).forEach(([id,[a,b]])=>{const el=$('#'+id);el.value=Q[a][b]||'';el.oninput=()=>{Q[a][b]=el.value;saveDraft()}});
@@ -737,6 +744,7 @@ function termsHTML(){const T=Q.terms;const sv=Q.pkg?.on?(Q.pkg.svc||[]):[];
   const r=[['Ödeme şekli',T.pay],['Teslim süresi',T.del],['Montaj',ins],['Garanti',T.war]].filter(x=>x[1]);
   return `<div class="d-terms">${NOVAT()?`<div class="w" style="font-weight:700;color:#9a1b1f">Fiyatlarımıza KDV dahil değildir.</div>`:''}${r.map(x=>`<div><b>${x[0]}</b>${esc(x[1])}</div>`).join('')}
    ${S.bank?`<div class="w"><b>Banka bilgileri</b>${esc(S.bank)}</div>`:''}
+   ${(T.xn||[]).length?`<div class="w"><b>Teklif notu</b>${T.xn.map(x=>'• '+esc(x)).join('<br>')}</div>`:''}
    ${T.notes?`<div class="w"><b>Not</b>${esc(T.notes).replace(/\n/g,'<br>')}</div>`:''}</div>
    <div class="d-sign"><div>Teklifi veren<br><b>${esc(Q.by||S.by)}</b>${(Q.by?Q.byph:S.byph)?' · '+esc(Q.by?Q.byph:S.byph):''}</div><div>Müşteri onayı<br><span style="color:#8a7f7c">Ad Soyad / İmza / Tarih</span></div></div>`}
 function custHTML(){const c=Q.customer;return `<div class="d-meta">
@@ -1034,7 +1042,7 @@ $('#newprod').onclick=()=>{
 };
 
 /* ---------- settings ---------- */
-const SMAP={'s-title':'title','s-addr':'addr','s-phone':'phone','s-wa':'wa','s-mail':'mail','s-web':'web','s-bank':'bank','s-by':'by','s-byph':'byph','s-prefix':'prefix','s-next':'next','s-vat':'vat','s-fxnote':'fxnote','s-pay':'pay','s-del':'del','s-ins':'ins','s-war':'war','s-thanks':'thanks','s-about':'about','s-notes':'notes','s-staff':'staff'};
+const SMAP={'s-title':'title','s-addr':'addr','s-phone':'phone','s-wa':'wa','s-mail':'mail','s-web':'web','s-bank':'bank','s-by':'by','s-byph':'byph','s-prefix':'prefix','s-next':'next','s-vat':'vat','s-fxnote':'fxnote','s-pay':'pay','s-del':'del','s-ins':'ins','s-war':'war','s-thanks':'thanks','s-about':'about','s-notes':'notes','s-staff':'staff','s-xnotes':'xnotes'};
 function fillSettings(){if(NEXTNO)S.next=NEXTNO;Object.entries(SMAP).forEach(([id,k])=>$('#'+id).value=S[k]??'');$('#s-tryincl').checked=!!S.tryIncl;$('#s-eurincl').checked=!!S.eurIncl}
 $('#ssave').onclick=async()=>{Object.entries(SMAP).forEach(([id,k])=>S[k]=$('#'+id).value);S.next=Number(S.next)||1;S.vat=Number(S.vat)||0;S.tryIncl=$('#s-tryincl').checked;S.eurIncl=$('#s-eurincl').checked;
   renderItems();
