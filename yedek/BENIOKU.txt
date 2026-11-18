@@ -22,3 +22,10 @@ NOTLAR
 - Hemen yedek almak için SIMDI-YEDEKLE.bat dosyasına çift tıklayın.
 - Program şifrenizi değiştirirseniz KURULUM.bat'ı yeniden çalıştırın.
 - Klasörü taşırsanız KURULUM.bat'ı yeni yerinde yeniden çalıştırın.
+
+GÜNCELLEME (Kasım 2026)
+- Yedek artık müşteri dosyalarını da alır (Veri\musteriler-TARİH.json).
+- Her yedekten sonra programın Panel ekranında "Gün sonu yedeği alındı" yazar;
+  yedek alınamazsa orada uyarı görünür (yalnızca yönetici hesabında).
+- Eski kurulumu güncellemek için: yeni yedek.ps1 dosyasını, kurulum yaptığınız klasördeki
+  eskisinin üzerine kopyalayın, sonra SIMDI-YEDEKLE.bat'a çift tıklayın. Yeniden kurmaya gerek yok.

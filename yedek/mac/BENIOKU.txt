@@ -20,3 +20,9 @@ NOTLAR
 - Mac 18:00'de uykudaysa yedek uyanınca, kapalıysa oturum açılınca alınır.
 - Hemen yedek almak için ~/YanarYedek içindeki "Simdi-Yedekle.command" dosyasını açın.
 - Program şifrenizi değiştirirseniz Kurulum.command'ı yeniden çalıştırın.
+
+GÜNCELLEME (Kasım 2026)
+- Yedek artık müşteri dosyalarını da alır (Veri/musteriler-TARİH.json).
+- Her yedekten sonra programın Panel ekranında "Gün sonu yedeği alındı" yazar;
+  yedek alınamazsa orada uyarı görünür (yalnızca yönetici hesabında).
+- Eski kurulumu güncellemek için Kurulum.command'ı yeniden açın (yeni dosyaları kopyalar).

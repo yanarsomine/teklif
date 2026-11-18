@@ -11,12 +11,14 @@ Ana dalda (`main`) yapılan her değişiklik GitHub Pages ile birkaç dakikada c
 - `data/thumbs.json` — liste için küçük resimler (data URI), anahtar ürün kodu.
 - `img/`, `img/m/` (mermer kataloğu), `drw/` (teknik çizimler), `logo.png`.
 - `supabase/kurulum.sql` — veritabanı şeması ve güvenlik kuralları (bölüm 5: müşteri takibi; ayrıca `supabase/musteri-takibi.sql`).
-- `yedek/` — gün sonu yedeği (Windows): `KURULUM.bat` giriş bilgisini DPAPI ile şifreler, Görev Zamanlayıcı'ya her gün 18:00 görevi kurar; `yedek.ps1` teklif verisini (JSON + CSV) ve gizli `teklifler` kovasındaki PDF'leri `Yedekler\` klasörüne indirir. Teklif kaydedilince/PDF indirilince PDF `teklifler/<id>.pdf` olarak arşivlenir (`archive.savePdf`).
+- `yedek/` — gün sonu yedeği (Windows): `KURULUM.bat` giriş bilgisini DPAPI ile şifreler, Görev Zamanlayıcı'ya her gün 18:00 görevi kurar; `yedek.ps1` teklif verisini (JSON + CSV) ve gizli `teklifler` kovasındaki PDF'leri `Yedekler\` klasörüne indirir. Teklif kaydedilince/PDF indirilince PDF `teklifler/<id>.pdf` olarak arşivlenir (`archive.savePdf`). Yedek ayrıca `musteriler*` verisini indirir ve sonucu `counter/backup` (başarılı) / `counter/backup-err` (hata) satırına yazar; Panel'deki yedek kutusu (yalnız admin) bunları okur. Mac sürümü `yedek/mac/`.
 - `.github/workflows/kur.yml` — hafta içi 09:43 ve 15:43'te TCMB döviz satış kurunu `docs(counter/rate)` satırına yazar (secrets: SUPABASE_URL, SUPABASE_SERVICE_KEY).
 
 ## Veri (Supabase `docs` tablosu: collection, id, data jsonb)
 - `quotes/<teklif no>` teklifler · `config/settings` ayarlar · `overrides/<kod>` fiyat/resim/gizleme ve metin değişiklikleri (name, cat, sub, unit, cur, short, defNote, feats, specs, varLabel, variants — "Düzenle" penceresi)
 - `musteriler/<id>` müşteri dosyası {ad, telefon, il, ilce, adres, isler:[{id, baslik, durum(yeni|plan|kesif|teklif|satis|vazgecti), kesifTarihi, somineTipi, hazneTipi, sonTeklif…}], sonTeklif, kod} · `musteriler/<id>/dosyalar/<id>` dosya kaydı {ad, tur(kesif|teklif|foto|diger), isId, assetId (gizli `musteri-dosyalari` kovası, `files.urls` ile imzalı bağlantı)} · teklifler `customerId`/`jobId` ile işe bağlanır
+- Revizyon: `revBase` (asıl no), `rev` (1,2…), `revOf`; numara `<asıl no>-R<n>`, kaydedilince verilir. Aylık özet revizyonları asıl teklifte toplar.
+- WhatsApp gönder: PDF hazırlanır, telefonda Web Share (dosya), değilse wa.me + PDF indirme.
 - `custom/<kod>` programdan eklenen ürünler · `counter/quotes` sıradaki numara · `counter/rate` {eur, usd, date}
 - Roller `profiles.role`: `admin` (fiyat, ayar, ürün düzenler) / `staff` (teklif hazırlar).
 

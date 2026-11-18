@@ -30,6 +30,13 @@ function run(a) {
       return [o.name, ts, Math.floor(t.getTime() / 1000), m ? id + ' - ' + m + '.pdf' : id + '.pdf'].join('|');
     }).join('\n');
   }
+  if (mod === 'musteri') return String(JSON.parse(oku(a[1])).filter(x => x.collection === 'musteriler').length);
+  if (mod === 'bildir') {   // id bilgisayar ...
+    const z = new Date().toISOString();
+    const d = a[1] === 'backup' ? { teklif: +a[3] || 0, musteri: +a[4] || 0, pdf: +a[5] || 0, not: String(a[6] || '').trim() } : { hata: String(a[3] || '') };
+    d.bilgisayar = a[2]; d.sistem = 'Mac'; d.zaman = z;
+    return JSON.stringify({ collection: 'counter', id: a[1], data: d, updated_at: z });
+  }
   if (mod === 'sayi') return String(JSON.parse(oku(a[1])).length);
   return '';
 }

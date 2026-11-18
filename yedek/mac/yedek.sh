@@ -12,7 +12,13 @@ js() { osascript -l JavaScript "$JS" "$@"; }
 mkdir "$DIR/.kilit" 2>/dev/null || { [ -n "$(find "$DIR/.kilit" -mmin +60 2>/dev/null)" ] && rmdir "$DIR/.kilit" && mkdir "$DIR/.kilit"; } || exit 0
 bitir() { rm -rf "$TMP"; rmdir "$DIR/.kilit" 2>/dev/null; }
 trap bitir EXIT
-hata() { yaz "HATA: $1"; exit 1; }
+bildir() {  # Programın Panel ekranındaki "Gün sonu yedeği" kutusu bu kaydı okur
+  [ -n "$AUTH" ] || return 0
+  js bildir "$1" "$(scutil --get ComputerName 2>/dev/null || hostname)" "$2" "$3" "$4" "$5" > "$TMP/b.json" &&
+  curl -sS -o /dev/null -X POST "$URL/rest/v1/docs" -H "apikey: $KEY" -H "$AUTH" -H 'Content-Type: application/json' \
+    -H 'Prefer: resolution=merge-duplicates' --data-binary @"$TMP/b.json" 2>/dev/null || true
+}
+hata() { yaz "HATA: $1"; bildir backup-err "$1"; exit 1; }
 
 EMAIL="$(cat "$DIR/eposta.txt" 2>/dev/null)"
 PASS="$(security find-generic-password -s 'YanarSomineTeklif' -a "$EMAIL" -w 2>/dev/null)"
@@ -30,6 +36,11 @@ AUTH="Authorization: Bearer $TOKEN"
 curl -sS -f "$URL/rest/v1/docs?collection=eq.quotes&select=id,data,updated_at&order=id" -H "apikey: $KEY" -H "$AUTH" \
   -o "$VERI/teklifler-$BUGUN.json" || hata "Teklif verileri indirilemedi."
 ADET="$(js csv "$VERI/teklifler-$BUGUN.json" "$VERI/teklif-listesi-$BUGUN.csv")"
+
+# Müşteri dosyaları (müşteri bilgileri, işler, dosya kayıtları)
+MUSTERI=0
+if curl -sS -f "$URL/rest/v1/docs?collection=like.musteriler*&select=collection,id,data,updated_at&order=collection,id" -H "apikey: $KEY" -H "$AUTH" \
+  -o "$VERI/musteriler-$BUGUN.json"; then MUSTERI="$(js musteri "$VERI/musteriler-$BUGUN.json")"; fi
 
 # 3) PDF'ler (yeni veya değişenler)
 YENI=0; PDFHATA=""; OFF=0
@@ -52,4 +63,5 @@ while :; do
   OFF=$((OFF + 1000))
 done
 
-yaz "Tamam: $ADET teklif kaydı, $YENI yeni/değişen PDF$PDFHATA"
+yaz "Tamam: $ADET teklif kaydı, $MUSTERI müşteri, $YENI yeni/değişen PDF$PDFHATA"
+bildir backup "$ADET" "$MUSTERI" "$YENI" "$PDFHATA"
