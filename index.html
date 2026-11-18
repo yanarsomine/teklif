@@ -1273,8 +1273,31 @@ async function buildPages(){
   return {pages,no};
 }
 function missingPrices(){return ALL().filter(i=>!Number(i.net)).length}
+/* Fiyatı girilmemiş kalem varsa önizleme / kaydetme / PDF'e geçmeden uyar */
+function priceGate(what){
+  const miss=ALL().filter(i=>!Number(i.net));if(!miss.length)return true;
+  document.querySelectorAll('.modal.pg').forEach(x=>x.remove());
+  const m=document.createElement('div');m.className='modal pg';
+  m.innerHTML=`<div class="dlg" role="alertdialog" aria-labelledby="pg-t"><h2 id="pg-t" style="margin:0;font-size:17px">Fiyatı girilmemiş ${miss.length} kalem var</h2>
+   <p class="note" style="margin:0;font-size:13.5px">${esc(what)} önce aşağıdaki kalemlere birim fiyat yazın.</p>
+   <ul style="margin:0;padding-left:18px;display:grid;gap:4px">${miss.map(i=>`<li><b>${esc(i.name||'Adsız kalem')}</b>${i.variant?` <span class="note">· ${esc(i.variant)}</span>`:''}</li>`).join('')}</ul>
+   <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn pri" type="button" id="pg-go">Fiyatları gir</button></div></div>`;
+  document.body.appendChild(m);
+  const close=()=>m.remove();
+  m.addEventListener('click',e=>{if(e.target===m)close()});
+  m.querySelector('#pg-go').onclick=()=>{close();
+    if(typeof setPane==='function')setPane('quote');
+    const pk=miss.find(i=>i.pkg);const first=miss.find(i=>!i.pkg);
+    if(first){$('#st-items')?.click();}else if(pk){$('#st-pkg')?.click();}
+    setTimeout(()=>{let firstEl=null;
+      miss.forEach(i=>{const inp=i.pkg?$('#pk-net'):document.querySelector(`.it[data-k="${i.k}"] [data-f="price"]`);if(inp){inp.style.borderColor='var(--danger)';inp.style.boxShadow='0 0 0 3px var(--bad-soft)';if(!firstEl)firstEl=inp;inp.addEventListener('input',()=>{inp.style.borderColor='';inp.style.boxShadow=''},{once:true})}});
+      if(firstEl){firstEl.scrollIntoView({block:'center',behavior:'smooth'});firstEl.focus({preventScroll:true})}},120)};
+  m.querySelector('#pg-go').focus();
+  return false;
+}
 async function openPreview(){
   if(!ALL().length){toast('Önce teklife ürün ekleyin');return}
+  if(!priceGate('Önizlemeye geçmeden'))return;
   const {pages}=await buildPages();
   const m=document.createElement('div');m.className='modal';
   const scale=Math.min(1,(window.innerWidth-40)/794);
@@ -1316,6 +1339,7 @@ function scheduleArchive(){
 }
 async function makePDF(){
   if(busy)return;if(!ALL().length){toast('Önce teklife ürün ekleyin');return}
+  if(!priceGate('PDF oluşturmadan'))return;
   if(!window.jspdf||!window.html2canvas){toast('PDF araçları yüklenemedi, sayfayı yenileyin');return}
   busy=true;$('#pdf').disabled=true;$('#pdf').textContent='PDF hazırlanıyor…';
   try{
@@ -1360,7 +1384,7 @@ async function _saveQuote(silent,noArchive){
   if(cur===Q){saveDraft();renderLink()}
   if(!silent)toast('Teklif '+cur.no+' kaydedildi'+note,3600)
 }
-$('#save').onclick=()=>saveQuote(false);
+$('#save').onclick=()=>{if(!ALL().length){toast('Boş teklif kaydedilmez');return}if(!priceGate('Kaydetmeden'))return;saveQuote(false)};
 
 /* ---------- products admin ---------- */
 let pcat='Tümü',psub='';
