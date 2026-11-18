@@ -1,5 +1,5 @@
 /* Yanar Şömine Teklif — Supabase arka ucu.
-   Uygulama kodu window.claude.use('db' | 'assets' | 'downloads' | 'user') çağrılarıyla çalışır;
+   Uygulama kodu window.claude.use('db' | 'assets' | 'downloads' | 'user' | 'archive' | 'files') çağrılarıyla çalışır;
    bu dosya aynı arayüzü Supabase ile sağlar. Tüm kayıtlar "docs" tablosunda (collection, id, data) tutulur. */
 (function () {
   const cfg = window.YS_CONFIG || {};
@@ -18,7 +18,7 @@
       o.innerHTML = `
       <form id="ys-lf" style="background:var(--panel,#fff);color:var(--ink,#1e1a19);border:1px solid var(--line,#e4dedb);border-radius:14px;padding:28px;width:min(380px,calc(100% - 32px));display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 40px rgba(0,0,0,.15)">
         <img src="logo.png" alt="Yanar Şömine" style="height:34px;width:auto;align-self:flex-start">
-        <div style="font-weight:700;font-size:17px">Teklif programına giriş</div>
+        <div style="font-weight:700;font-size:17px">Müşteri ve teklif programına giriş</div>
         <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted,#6f6764)">E-posta<input id="ys-em" type="email" autocomplete="username" required style="padding:9px 10px;border:1px solid var(--line,#e4dedb);border-radius:8px;font:inherit;font-size:14px;color:inherit;background:var(--bg,#f6f4f2)"></label>
         <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted,#6f6764)">Şifre<input id="ys-pw" type="password" autocomplete="current-password" required style="padding:9px 10px;border:1px solid var(--line,#e4dedb);border-radius:8px;font:inherit;font-size:14px;color:inherit;background:var(--bg,#f6f4f2)"></label>
         <button style="padding:10px;border:0;border-radius:8px;background:var(--brand,#9a1b1f);color:#fff;font-weight:700;font-size:14px;cursor:pointer">Giriş yap</button>
@@ -55,7 +55,8 @@
   }
 
   /* ---------- db adapter ---------- */
-  const split = path => { const p = path.split('/'); return { col: p[0], id: p[1] }; };
+  const split = path => { const p = path.split('/'); return { col: p.slice(0, -1).join('/'), id: p[p.length - 1] }; };
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
   const snapDoc = (id, row) => ({ id, exists: !!row, data: () => row ? row.data : undefined, metadata: { fromCache: false, hasPendingWrites: false } });
   const subs = new Map(); // collection -> Set(fn)
   let channel = null;
@@ -87,7 +88,7 @@
     collection(col) {
       const q = {
         path: col,
-        doc: id => db.doc(col + '/' + id),
+        doc: id => db.doc(col + '/' + (id || newId())),
         async get() {
           const { data, error } = await sb.from('docs').select('id,data').eq('collection', col).limit(5000); if (error) throw fail(error);
           const docs = (data || []).map(r => snapDoc(r.id, r));
@@ -122,6 +123,26 @@
     }
   };
 
+  /* ---------- files (müşteri dosyaları: gizli "musteri-dosyalari" kovası, süreli imzalı bağlantıyla açılır) ---------- */
+  const FB = 'musteri-dosyalari';
+  const files = {
+    async upload(blob, opts) {
+      const type = (opts && opts.type) || blob.type || 'application/octet-stream';
+      const nm = (blob.name || 'dosya').split('.'); const ext = nm.length > 1 ? nm.pop().toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) : '';
+      const name = `${new Date().toISOString().slice(0, 7)}/${newId()}${ext ? '.' + ext : ''}`;
+      const { error } = await sb.storage.from(FB).upload(name, blob, { contentType: type, upsert: false });
+      if (error) throw fail(error);
+      return { id: name, sizeBytes: blob.size, contentType: type };
+    },
+    async urls(ids) {
+      if (!ids.length) return {};
+      const { data, error } = await sb.storage.from(FB).createSignedUrls(ids, 3600);
+      if (error) throw fail(error);
+      const out = {}; (data || []).forEach(x => { if (x.signedUrl) out[x.path] = x.signedUrl; }); return out;
+    },
+    async remove(id) { const { error } = await sb.storage.from(FB).remove([id]); if (error) throw fail(error); }
+  };
+
   /* ---------- downloads (normal browser download) ---------- */
   const downloads = {
     async save({ filename, data }) {
@@ -137,6 +158,14 @@
     async canEdit() { return profile?.role === 'admin'; },
     async isOwner() { return profile?.role === 'admin'; },
     async id() { return session?.user?.id || null; },
+    async can() { return !!session; },
+    async profiles(ids) {
+      const { data } = await sb.from('profiles').select('id,name').in('id', ids);
+      const out = {}; (data || []).forEach(p => { out[p.id] = { name: p.name || '' }; });
+      if (session && ids.includes(session.user.id) && !out[session.user.id]?.name) out[session.user.id] = { name: profile?.name || session.user.email || '' };
+      return out;
+    },
+    async signOut() { await sb.auth.signOut(); location.reload(); },
     async me() { return { id: session?.user?.id || null, name: profile?.name || '', email: session?.user?.email || null, isOwner: profile?.role === 'admin', canEdit: profile?.role === 'admin' }; }
   };
 
@@ -144,7 +173,7 @@
     async use(name) {
       if (!sb) return null;
       await authed;
-      return { db, assets, downloads, user, archive }[name] || null;
+      return { db, assets, downloads, user, archive, files }[name] || null;
     }
   };
 
