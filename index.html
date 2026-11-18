@@ -547,7 +547,7 @@ button.kpi:hover{border-color:var(--muted)}
 .mdate{display:none}
 @media (max-width:700px){.mdate{display:inline}}
 @media (max-width:980px){
-  .toast{bottom:auto;top:calc(58px + env(safe-area-inset-top,0px))}
+  .toast{bottom:calc(var(--bnav) + 78px + env(safe-area-inset-bottom,0px))}
   #v-teklif{padding-bottom:72px}
 }
 .ro #save,.ro [data-go-new],.ro [data-go-newc],.ro [data-dup],.ro [data-rm],.ro #newq,.ro #addfree,.ro .bn-new{display:none!important}
@@ -566,6 +566,30 @@ button.kpi:hover{border-color:var(--muted)}
 #v-urunler .chips{border-bottom:0;padding-bottom:4px}
 .side-foot #ys-out{margin-left:auto}
 .out-i{color:var(--danger)!important}
+
+/* --- telefon düzeltmeleri --- */
+@media (max-width:980px){
+  .it select,.it input,.it textarea{max-width:100%}
+}
+@media (max-width:700px){
+  .pane-h{flex-wrap:wrap;gap:8px}
+  .pane-h .search{flex:1 1 100%;min-width:0;max-width:none}
+  #v-urunler table.list thead{display:none}
+  #v-urunler table.list,#v-urunler table.list tbody{display:block;width:100%}
+  #v-urunler table.list tr{display:grid;grid-template-columns:44px minmax(0,1fr);gap:4px 10px;padding:12px;border-bottom:1px solid var(--line)}
+  #v-urunler table.list tr.pgrp{display:block;padding:0}
+  #v-urunler table.list tr.pgrp td{display:block}
+  #v-urunler table.list td{border:0;padding:0;min-width:0}
+  #v-urunler td.u-th{grid-row:1/span 2}
+  #v-urunler td.u-nm,#v-urunler td.u-sub{grid-column:2}
+  #v-urunler td.u-pr{grid-column:1/-1;margin-top:4px}
+  #v-urunler td.u-pr .kv{flex-wrap:wrap}
+  #v-urunler td.u-pr .kv>.note{flex:1 1 auto}
+  #v-urunler td.u-dr,#v-urunler td.u-ph,#v-urunler td.u-ac{grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;white-space:normal!important}
+  #v-urunler td.u-dr br{display:none}#v-urunler td.u-dr .btn{margin-top:0!important}
+  #v-urunler .tw{overflow:visible}
+  .dhead{flex-wrap:wrap}.dhead .code{white-space:normal;word-break:break-word}
+}
 </style>
 </head>
 <body>
@@ -946,7 +970,7 @@ function renderItems(){
       <button class="btn sm ghost" data-up="${n}" aria-label="Yukarı" ${n?'':'disabled'}>↑</button>
       <button class="btn sm ghost dng" data-del="${i.k}" aria-label="Kaldır">✕</button>
     </div>
-    ${p&&p.variants?.length?`<div style="margin-top:4px;display:flex;gap:6px;align-items:center"><span class="note" style="font-weight:600">${esc(p.varLabel||'Seçenek')}:</span><select data-f="variant" style="border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-size:12px;background:var(--bg)">${p.variants.map(v=>`<option ${v.v===i.variant?'selected':''}>${esc(v.v)}</option>`).join('')}</select></div>`:''}
+    ${p&&p.variants?.length?`<div style="margin-top:4px;display:flex;gap:6px;align-items:center;min-width:0"><span class="note" style="font-weight:600;flex:none">${esc(p.varLabel||'Seçenek')}:</span><select data-f="variant" style="min-width:0;max-width:100%;flex:1 1 auto;border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-size:12px;background:var(--bg)">${p.variants.map(v=>`<option ${v.v===i.variant?'selected':''}>${esc(v.v)}</option>`).join('')}</select></div>`:''}
     <div style="margin-top:4px"><textarea data-f="note" rows="${(i.note||i.desc)?2:1}" class="ntin" placeholder="${p&&p.made?'Açıklama: taş türü, iç hazne, ölçü (ör. Carrara mermer, Tzaki Eco 75, 160 cm)':'Açıklama (isteğe bağlı) – teklifte ürünün altında ve ürün sayfasında görünür'}">${esc(i.note||i.desc||'')}</textarea></div>
     <div class="ctl">
       <div class="f"><label>Miktar${i.unit&&i.unit!=='adet'?' ('+esc(i.unit)+')':''}</label><input class="w-q" type="number" min="0" step="any" data-f="qty" value="${i.qty}"></div>
@@ -1403,14 +1427,14 @@ function renderPAdmin(){
   list.sort((a,b)=>ord(a.cat)-ord(b.cat));
   let last=null;
   $('#plist').innerHTML=list.map(p=>`${p.cat!==last?(last=p.cat,`<tr class="pgrp"><td colspan="7">${esc(p.cat)} <span class="note">· ${list.filter(x=>x.cat===p.cat).length} ürün</span></td></tr>`):''}<tr data-code="${esc(p.code)}">
-   <td>${thumbOf(p)?`<img class="mini" src="${esc(thumbOf(p))}" alt="">`:''}</td>
-   <td><b>${esc(p.name)}</b>${p.hidden?' <span class="badge">gizli</span>':''}${p.custom?' <span class="badge">özel</span>':''}<div class="note">${esc(p.code)}</div></td>
-   <td class="note">${esc(p.sub)}</td>
-   <td>${p.variants?.length?p.variants.map(v=>`<div class="kv" style="margin:2px 0"><span class="note" style="min-width:70px">${esc(v.v)}</span><input type="number" min="0" step="0.01" data-vp="${esc(v.v)}" value="${v.price||''}" style="width:100px;border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:var(--bg)"> ${CURS[p.cur]||'₺'}</div>`).join('')
+   <td class="u-th">${thumbOf(p)?`<img class="mini" src="${esc(thumbOf(p))}" alt="">`:''}</td>
+   <td class="u-nm"><b>${esc(p.name)}</b>${p.hidden?' <span class="badge">gizli</span>':''}${p.custom?' <span class="badge">özel</span>':''}<div class="note">${esc(p.code)}</div></td>
+   <td class="note u-sub">${esc(p.sub)}</td>
+   <td class="u-pr">${p.variants?.length?p.variants.map(v=>`<div class="kv" style="margin:2px 0"><span class="note" style="min-width:70px">${esc(v.v)}</span><input type="number" min="0" step="0.01" data-vp="${esc(v.v)}" value="${v.price||''}" style="width:100px;border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:var(--bg)"> ${CURS[p.cur]||'₺'}</div>`).join('')
      :`<div class="kv"><input type="number" min="0" step="0.01" data-p value="${p.price||''}" placeholder="Fiyat" style="width:110px;border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:var(--bg)"> ${CURS[p.cur]||'₺'}</div>`}</td>
-   <td>${p.drw?`<a href="${esc(p.drw)}" target="_blank" rel="noopener"><img class="mini" src="${esc(p.drw)}" alt="çizim"></a>`:'<span class="note">yok</span>'}<br><label class="btn sm" style="display:inline-block;margin-top:4px">${p.drw?'Değiştir':'Yükle'}<input type="file" accept="image/*" data-up="drw" hidden></label></td>
-   <td><label class="btn sm" style="display:inline-block">Fotoğraf yükle<input type="file" accept="image/*" data-up="img" hidden></label></td>
-   <td style="white-space:nowrap"><button class="btn sm" data-edit>Düzenle</button> <button class="btn sm ghost" data-hide>${p.hidden?'Göster':'Gizle'}</button>${OVR[p.code]&&TEXTKEYS.some(k=>OVR[p.code][k]!=null)?'<div class="note" style="margin-top:2px">düzenlendi</div>':''}</td></tr>`).join('')||'<tr><td colspan="7"><div class="empty">Eşleşen ürün yok.</div></td></tr>';
+   <td class="u-dr">${p.drw?`<a href="${esc(p.drw)}" target="_blank" rel="noopener"><img class="mini" src="${esc(p.drw)}" alt="çizim"></a>`:'<span class="note">yok</span>'}<br><label class="btn sm" style="display:inline-block;margin-top:4px">${p.drw?'Değiştir':'Yükle'}<input type="file" accept="image/*" data-up="drw" hidden></label></td>
+   <td class="u-ph"><label class="btn sm" style="display:inline-block">Fotoğraf yükle<input type="file" accept="image/*" data-up="img" hidden></label></td>
+   <td class="u-ac" style="white-space:nowrap"><button class="btn sm" data-edit>Düzenle</button> <button class="btn sm ghost" data-hide>${p.hidden?'Göster':'Gizle'}</button>${OVR[p.code]&&TEXTKEYS.some(k=>OVR[p.code][k]!=null)?'<div class="note" style="margin-top:2px">düzenlendi</div>':''}</td></tr>`).join('')||'<tr><td colspan="7"><div class="empty">Eşleşen ürün yok.</div></td></tr>';
 }
 async function setOvr(code,patch){
   OVR[code]={...(OVR[code]||{}),...patch};buildProducts();
