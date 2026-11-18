@@ -1287,6 +1287,10 @@ async function openPreview(){
   m.querySelector('#mpdf').onclick=()=>{m.remove();makePDF()};
 }
 let busy=false;
+/* PDF'in içine gömülen teklif özeti: teklif PDF'i müşteri dosyasına yüklendiğinde bilgiler buradan okunur */
+function pdfInfo(){const t=totals();const a=quoteAmount(t);
+  return {id:Q.id||null,no:Q.no||'',date:Q.date,customer:{...Q.customer},customerId:Q.customerId||null,jobId:Q.jobId||null,offer:a,kdvHaric:NOVAT(),
+    totals:Object.fromEntries(Object.entries(t).map(([c,x])=>[c,+x.total.toFixed(2)])),items:ALL().filter(i=>!i.pkg).map(i=>i.name).filter(Boolean).slice(0,30)}}
 async function renderPdfBlob(){
   const {pages,no}=await buildPages();
   const pdf=new jspdf.jsPDF({unit:'mm',format:'a4',compress:true});
@@ -1295,6 +1299,7 @@ async function renderPdfBlob(){
     if(k)pdf.addPage();
     pdf.addImage(cv.toDataURL('image/jpeg',0.86),'JPEG',0,0,210,297,undefined,'FAST');
   }
+  try{pdf.setProperties({title:'Yanar Somine Teklif '+no,author:'Yanar Somine',creator:'Yanar Somine Teklif',keywords:Q.id||'',subject:'YSQ1:'+btoa(unescape(encodeURIComponent(JSON.stringify(pdfInfo())))) })}catch(e){}
   return {blob:pdf.output('blob'),no};
 }
 async function archivePdf(blob){
@@ -1613,6 +1618,7 @@ function dupQuote(id){
 }
 window.App={
   quotesFor:(cid,jid)=>QUOTES.filter(q=>q.customerId===cid&&(jid==null||q.jobId===jid)),
+  findQuote:(id,no)=>QUOTES.find(q=>(id&&q.id===id)||(no&&q.no===no))||null,
   newQuoteFor,openQuote,dupQuote,money,
   onCustomers(){ DBREADY=CRM.ready();$$('[data-go-newc]').forEach(b=>b.hidden=!CRM.writable());$('#n-musteri').textContent=CRM.all().length||'';renderLink();if(!$('#v-panel').hidden)renderDash();if(!$('#v-kayitli').hidden)renderSaved() }
 };
@@ -2580,8 +2586,25 @@ function parseOfferLines(lines){
   };
 }
 
+function offerFromQuote(q){
+  const c=q.customer||{}, o=q.offer||(()=>{const e=Object.entries(q.totals||{});return e.length?{tutar:e[0][1],pb:e[0][0]}:null})();
+  return {musteri:{ad:c.name||"",firma:"",telefon:c.phone||"",eposta:c.email||"",il:"",ilce:"",mahalle:"",adres:""},
+    teklif:{no:q.no||"",tarih:q.date||"",toplam:o?o.tutar:null,pb:o&&o.pb==="EUR"?"EUR":"TL",kdvDahil:q.kdvHaric?false:true,urunler:q.items?.length&&typeof q.items[0]==="string"?q.items:(q.items||[]).filter(i=>!i.pkg).map(i=>i.name).filter(Boolean),isAdi:c.project||""},
+    isAdresi:{il:"",ilce:"",adres:""}, quoteId:q.id||null, link:q.customerId?{customerId:q.customerId,jobId:q.jobId||null}:null};
+}
+async function quoteInPdf(file){
+  let info=null;
+  try{ if(window.pdfjsLib){ const pdf=await window.pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;
+      const md=await pdf.getMetadata(); const sj=md?.info?.Subject||"";
+      if(sj.startsWith("YSQ1:")) info=JSON.parse(decodeURIComponent(escape(atob(sj.slice(5))))); } }catch(e){}
+  const no=(file.name.match(/YS[-_ ]\d{4}[-_ ]\d{3,5}/i)||[""])[0].replace(/[_ ]/g,"-").toUpperCase();
+  const live=window.App?.findQuote(info?.id, info?.no||no);
+  if(live) return {...live, kdvHaric: info?.kdvHaric ?? false, offer: live.offer||info?.offer||null};
+  return info;
+}
 async function readOffer(file){
   const isPdf=/pdf$/i.test(file.type)||/\.pdf$/i.test(file.name);
+  if(isPdf){ const q=await quoteInPdf(file); if(q) return {data:offerFromQuote(q), err:"", fromQuote:true}; }
   if(!isPdf) return {err:"Fotoğraflardan otomatik okuma yapılmıyor; bilgileri elle girin. PDF tekliflerde bilgiler kendiliğinden dolar."};
   let lines;
   try{ lines=await pdfLines(file); }catch(e){ return {err: e?.code==="nopdf"? "PDF okuyucu yüklenemedi; sayfayı yenileyip tekrar deneyin." : "PDF açılamadı. Dosya bozuk veya şifreli olabilir."}; }
@@ -2626,7 +2649,7 @@ async function startImport(file){
   const r=await readOffer(file);
   if(state.openId!=="__import"||imp.file!==file) return;
   imp.data=r.data||{musteri:{},teklif:{urunler:[]},isAdresi:{}};
-  imp.err=r.err||""; imp.status="ready"; imp.v++; renderDrawer();
+  imp.err=r.err||""; imp.fromQuote=!!r.fromQuote; imp.status="ready"; imp.v++; renderDrawer();
 }
 function importView(){
   const out=[];
@@ -2650,6 +2673,7 @@ function importView(){
   // ready / saving
   const d=imp.data, m=d.musteri, t=d.teklif;
   if(imp.err) out.push(el("div",{class:"notice",text:imp.err}));
+  else if(imp.fromQuote) out.push(el("p",{class:"hint",text:`Bu PDF programda hazırlanan ${d.teklif.no||"bir"} numaralı teklif; bilgiler tekliften dolduruldu. Kontrol edip kaydedin.`}));
   else out.push(el("p",{class:"hint",text:"Tekliften okunan bilgiler aşağıda. Yanlış olan varsa düzeltip kaydedin."}));
   const f=el("form",{class:"fgrid",novalidate:true});
   const matches=matchCustomers(m);
@@ -2660,6 +2684,7 @@ function importView(){
   const others=customers.filter(c=>!mIds.has(c.id)).sort((a,b)=>(a.ad||"").localeCompare(b.ad||"","tr"));
   if(others.length){ const g=el("optgroup",{label:"Diğer müşteriler"}); for(const c of others) g.append(el("option",{value:c.id},[c.ad,titleCase(c.ilce)].filter(Boolean).join(" — "))); tSel.append(g); }
   if(matches.length) tSel.value=matches[0].c.id;
+  if(d.link&&freshC(d.link.customerId)){ if(![...tSel.options].some(o=>o.value===d.link.customerId)) tSel.append(el("option",{value:d.link.customerId},freshC(d.link.customerId).ad||"Müşteri")); tSel.value=d.link.customerId; }
   f.append(el("div",{class:"full subhead",text:"Müşteri"}), fld("i_target","Bu teklif kimin?",tSel,true));
   const custBox=el("div",{class:"full fgrid",style:"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px"});
   custBox.append(
@@ -2691,6 +2716,7 @@ function importView(){
       for(const j of sorted) jSel.append(el("option",{value:j.id},`${j.baslik||"İş"} (${ST[j.durum||"yeni"]})`));
       const open=sorted.filter(j=>["yeni","plan","kesif","teklif"].includes(j.durum||"yeni"));
       if(open.length===1) jSel.value=open[0].id;
+      if(d.link&&d.link.customerId===id&&d.link.jobId&&jobs.some(j=>j.id===d.link.jobId)) jSel.value=d.link.jobId;
       const {got}=fillEmpty(c,m);
       fillNote.textContent = got.length? `${c.ad} dosyasında boş olan ${got.join(", ")} bilgileri tekliften tamamlanacak.` : "";
     } else fillNote.textContent="";
@@ -2738,6 +2764,7 @@ function importView(){
       const fdoc={ad:file.name,tur:"teklif",isId:jid,assetId:r.id,contentType:r.contentType,boyut:r.sizeBytes,tarih,aciklama:v("i_desc"),ekleyen:me||null};
       if(tutar!=null){ fdoc.tutar=tutar; fdoc.pb=pb; }
       await db.collection(`musteriler/${cid}/dosyalar`).doc().set(fdoc);
+      if(d.quoteId){ try{ await db.doc("quotes/"+d.quoteId).update({customerId:cid,jobId:jid,newJob:false,noLink:false}); }catch(e){} }
       toast(isNewC? "Yeni müşteri ve teklif kaydedildi" : "Teklif müşteri dosyasına eklendi");
       openCustomer(cid, jid); state.tab="teklif"; renderDrawer();
     }catch(ex){
