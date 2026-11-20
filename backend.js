@@ -41,8 +41,14 @@
   async function onSession(s) {
     session = s;
     if (!s) { loginUI(); return; }
-    const { data } = await sb.from('profiles').select('role,name').eq('id', s.user.id).maybeSingle();
-    profile = data || { role: 'staff', name: '' };
+    const { data, error } = await sb.from('profiles').select('role,name').eq('id', s.user.id).maybeSingle();
+    if (error) { loginUI('Bağlantı hatası, sayfayı yenileyin.'); return; }
+    profile = data || { role: 'pending', name: '' };
+    if (!['admin', 'staff'].includes(profile.role)) {
+      // Onaylanmamış hesap: hiçbir veriye erişemez (veritabanı kuralları da engeller)
+      loginUI('Hesabınız henüz onaylanmadı. Yöneticinizden onay isteyin.');
+      await sb.auth.signOut(); session = null; return;
+    }
     hideLogin(); addLogout(); resolveAuth(true);
   }
   function addLogout() {
@@ -57,48 +63,123 @@
   /* ---------- db adapter ---------- */
   const split = path => { const p = path.split('/'); return { col: p.slice(0, -1).join('/'), id: p[p.length - 1] }; };
   const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-  const snapDoc = (id, row) => ({ id, exists: !!row, data: () => row ? row.data : undefined, metadata: { fromCache: false, hasPendingWrites: false } });
-  const subs = new Map(); // collection -> Set(fn)
-  let channel = null;
+  const snapDoc = (id, row) => ({ id, exists: !!row, updatedAt: row ? row.updated_at : null, data: () => row ? row.data : undefined, metadata: { fromCache: false, hasPendingWrites: false } });
+  const fail = e => { const err = new Error(e.message || 'Kayıt hatası'); err.code = e.code === '23505' ? 'exists' : (e.code || 'unavailable'); return err; };
+  const PAGE = 1000;
+
+  /* Canlı güncelleme: değişen satır tek tek yeniden okunur; bağlantı kopunca ve uygulama öne gelince her şey tazelenir */
+  const colSubs = new Map(); // collection -> Set(listener)
+  const docSubs = new Map(); // "col\u0000id" -> Set(listener)
+  let channel = null, chanOk = false, lastFull = 0;
+  function refreshAll() {
+    lastFull = Date.now();
+    colSubs.forEach(set => set.forEach(l => l.full()));
+    docSubs.forEach(set => set.forEach(l => l.full()));
+  }
   function ensureChannel() {
     if (channel) return;
     channel = sb.channel('docs-all').on('postgres_changes', { event: '*', schema: 'public', table: 'docs' }, payload => {
-      const col = (payload.new && payload.new.collection) || (payload.old && payload.old.collection);
-      (subs.get(col) || new Set()).forEach(fn => fn());
-      if (!col) subs.forEach(set => set.forEach(fn => fn()));
-    }).subscribe();
+      const row = (payload.new && payload.new.collection) ? payload.new : payload.old || {};
+      const col = row.collection, id = row.id;
+      if (!col) { refreshAll(); return; }
+      (colSubs.get(col) || new Set()).forEach(l => l.one(id, payload.eventType));
+      (docSubs.get(col + '\u0000' + id) || new Set()).forEach(l => l.full());
+    }).subscribe(status => {
+      if (status === 'SUBSCRIBED') { if (!chanOk && lastFull) refreshAll(); chanOk = true; }
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') chanOk = false;
+    });
   }
-  function watch(col, fn) { ensureChannel(); if (!subs.has(col)) subs.set(col, new Set()); subs.get(col).add(fn); fn(); return () => subs.get(col).delete(fn); }
-  const fail = e => { const err = new Error(e.message || 'Kayıt hatası'); err.code = e.code || 'unavailable'; return err; };
+  const wake = () => { if (document.visibilityState === 'visible' && Date.now() - lastFull > 5000) refreshAll(); };
+  document.addEventListener('visibilitychange', wake);
+  window.addEventListener('online', () => { lastFull = 0; wake(); });
+  window.addEventListener('pageshow', e => { if (e.persisted) wake(); });
+
+  async function getRow(col, id) {
+    const { data, error } = await sb.from('docs').select('data,updated_at').eq('collection', col).eq('id', id).maybeSingle();
+    if (error) throw fail(error); return data;
+  }
+  async function getAll(col) {
+    const rows = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await sb.from('docs').select('id,data,updated_at').eq('collection', col).order('id').range(from, from + PAGE - 1);
+      if (error) throw fail(error);
+      rows.push(...(data || [])); if (!data || data.length < PAGE) break;
+    }
+    return rows;
+  }
+  const colSnap = map => { const docs = [...map.entries()].map(([id, r]) => snapDoc(id, r)); return { docs, size: docs.length, empty: !docs.length, docChanges: () => [], metadata: { fromCache: false, hasPendingWrites: false } }; };
 
   const db = {
     doc(path) {
       const { col, id } = split(path);
-      return {
+      const ref = {
         id, path,
-        async get() { const { data, error } = await sb.from('docs').select('data').eq('collection', col).eq('id', id).maybeSingle(); if (error) throw fail(error); return snapDoc(id, data); },
-        async set(d) { const { error } = await sb.from('docs').upsert({ collection: col, id, data: d, updated_at: new Date().toISOString() }); if (error) throw fail(error); },
-        async update(d) { const cur = await this.get(); await this.set({ ...(cur.data() || {}), ...d }); },
+        async get() { return snapDoc(id, await getRow(col, id)); },
+        async set(d) {
+          const { data, error } = await sb.from('docs').upsert({ collection: col, id, data: d, updated_at: new Date().toISOString() }).select('updated_at');
+          if (error) throw fail(error); return data && data[0] ? data[0].updated_at : null;
+        },
+        /* Yeni kayıt: aynı adla kayıt varsa üzerine YAZMAZ, code:'exists' hatası verir */
+        async create(d) {
+          const { data, error } = await sb.from('docs').insert({ collection: col, id, data: d, updated_at: new Date().toISOString() }).select('updated_at');
+          if (error) throw fail(error); return data && data[0] ? data[0].updated_at : null;
+        },
+        /* Başkası bu arada değiştirmediyse yaz (iyimser kilit); değiştirdiyse code:'conflict' */
+        async setIf(d, ts) {
+          if (!ts) return ref.set(d);
+          const { data, error } = await sb.from('docs').update({ data: d, updated_at: new Date().toISOString() }).eq('collection', col).eq('id', id).eq('updated_at', ts).select('updated_at');
+          if (error) throw fail(error);
+          if (!data || !data.length) { const e = new Error('Bu kayıt başka biri tarafından değiştirildi'); e.code = 'conflict'; throw e; }
+          return data[0].updated_at;
+        },
+        /* Güncel kaydı okuyup fn ile değiştirir; araya başka kayıt girerse yeniden dener */
+        async mutate(fn) {
+          for (let k = 0; k < 6; k++) {
+            const row = await getRow(col, id);
+            const next = fn(row ? JSON.parse(JSON.stringify(row.data || {})) : null);
+            if (next === undefined) return null;
+            try { return row ? await ref.setIf(next, row.updated_at) : await ref.create(next); }
+            catch (e) { if (e.code !== 'conflict' && e.code !== 'exists') throw e; await new Promise(r => setTimeout(r, 120 + Math.random() * 300)); }
+          }
+          const e = new Error('Kayıt çok sık değişiyor, tekrar deneyin'); e.code = 'conflict'; throw e;
+        },
+        async update(d) { return ref.mutate(cur => ({ ...(cur || {}), ...d })); },
         async delete() { const { error } = await sb.from('docs').delete().eq('collection', col).eq('id', id); if (error) throw fail(error); },
         onSnapshot(next, err) {
-          return watch(col, async () => { try { next(await this.get()); } catch (e) { err && err(e); } });
+          ensureChannel(); const key = col + '\u0000' + id;
+          const l = { full: async () => { try { next(await ref.get()); } catch (e) { err && err(e); } } };
+          if (!docSubs.has(key)) docSubs.set(key, new Set()); docSubs.get(key).add(l); l.full(); lastFull = lastFull || Date.now();
+          return () => docSubs.get(key).delete(l);
         }
       };
+      return ref;
     },
     collection(col) {
       const q = {
         path: col,
         doc: id => db.doc(col + '/' + (id || newId())),
-        async get() {
-          const { data, error } = await sb.from('docs').select('id,data').eq('collection', col).limit(5000); if (error) throw fail(error);
-          const docs = (data || []).map(r => snapDoc(r.id, r));
-          return { docs, size: docs.length, empty: !docs.length, docChanges: () => [], metadata: { fromCache: false, hasPendingWrites: false } };
+        async get() { const m = new Map(); (await getAll(col)).forEach(r => m.set(r.id, r)); return colSnap(m); },
+        onSnapshot(next, err) {
+          ensureChannel();
+          let cache = null, t = null;
+          const emit = () => { clearTimeout(t); t = setTimeout(() => next(colSnap(cache)), 60); };
+          const l = {
+            full: async () => { try { const m = new Map(); (await getAll(col)).forEach(r => m.set(r.id, r)); cache = m; next(colSnap(cache)); } catch (e) { err && err(e); } },
+            one: async (id, ev) => {
+              if (!cache) return l.full();
+              try { if (ev === 'DELETE') cache.delete(id); else { const r = await getRow(col, id); if (r) cache.set(id, { id, ...r }); else cache.delete(id); } emit(); }
+              catch (e) { err && err(e); }
+            }
+          };
+          if (!colSubs.has(col)) colSubs.set(col, new Set()); colSubs.get(col).add(l); l.full(); lastFull = lastFull || Date.now();
+          return () => colSubs.get(col).delete(l);
         },
-        onSnapshot(next, err) { return watch(col, async () => { try { next(await q.get()); } catch (e) { err && err(e); } }); },
         where() { return q; }, orderBy() { return q; }, limit() { return q; }
       };
       return q;
-    }
+    },
+    /* Sunucu fonksiyonu (ör. sıradaki teklif numarası) */
+    async rpc(name, args) { const { data, error } = await sb.rpc(name, args || {}); if (error) throw fail(error); return data; }
   };
 
   /* ---------- assets (Supabase Storage, bucket "uploads") ---------- */
@@ -120,7 +201,8 @@
       const { error } = await sb.storage.from('teklifler').upload(`${id}.pdf`, blob, { contentType: 'application/pdf', upsert: true });
       if (error) throw fail(error);
       return true;
-    }
+    },
+    async remove(id) { const { error } = await sb.storage.from('teklifler').remove([`${id}.pdf`]); if (error) throw fail(error); }
   };
 
   /* ---------- files (müşteri dosyaları: gizli "musteri-dosyalari" kovası, süreli imzalı bağlantıyla açılır) ---------- */
@@ -156,6 +238,7 @@
   /* ---------- user ---------- */
   const user = {
     async canEdit() { return profile?.role === 'admin'; },
+    async role() { return profile?.role || null; },
     async isOwner() { return profile?.role === 'admin'; },
     async id() { return session?.user?.id || null; },
     async can() { return !!session; },
@@ -166,7 +249,7 @@
       return out;
     },
     async signOut() { await sb.auth.signOut(); location.reload(); },
-    async me() { return { id: session?.user?.id || null, name: profile?.name || '', email: session?.user?.email || null, isOwner: profile?.role === 'admin', canEdit: profile?.role === 'admin' }; }
+    async me() { return { id: session?.user?.id || null, name: profile?.name || '', role: profile?.role || null, email: session?.user?.email || null, isOwner: profile?.role === 'admin', canEdit: profile?.role === 'admin' }; }
   };
 
   window.claude = {

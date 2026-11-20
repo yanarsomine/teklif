@@ -29,3 +29,11 @@ GÜNCELLEME (Kasım 2026)
   yedek alınamazsa orada uyarı görünür (yalnızca yönetici hesabında).
 - Eski kurulumu güncellemek için: yeni yedek.ps1 dosyasını, kurulum yaptığınız klasördeki
   eskisinin üzerine kopyalayın, sonra SIMDI-YEDEKLE.bat'a çift tıklayın. Yeniden kurmaya gerek yok.
+
+GÜNCELLEME 2 (20 Kasım 2026)
+- Yedek artık programdaki TÜM kayıtları alır: teklifler, müşteriler, programdan girilen fiyatlar ve ayarlar
+  (Veri\tum-veri-TARİH.json). Kayıt sayısı sunucudakiyle tutmazsa yedek "HATA" yazar.
+- Müşterilere yüklenen dosyalar (keşif çizimleri, fotoğraflar, PDF'ler) de iner: Yedekler\MusteriDosyalari.
+- Güncellemek için: yeni dosyaları kurulum klasöründekilerin üzerine kopyalayın.
+- Yedek için ayrı bir kullanıcı (ör. yedek@...) açıp personel olarak onaylamanız önerilir; kendi şifrenizi bu bilgisayarda saklamamış olursunuz.
+
