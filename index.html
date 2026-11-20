@@ -747,6 +747,27 @@ table.list th,.list th{font-size:11px;letter-spacing:.06em;text-transform:upperc
   .bn-new i{background:var(--brand);border-radius:8px}
   .more:not([hidden]){border-radius:8px}
 }
+/* --- koyu tema okunurluk düzeltmeleri --- */
+:root[data-theme="dark"] .mtitle,:root[data-theme="dark"] .bn[aria-current="page"],:root[data-theme="dark"] .paneswitch button[aria-selected="true"]{color:#fff!important}
+:root[data-theme="dark"] .btn.pri,:root[data-theme="dark"] .btn.primary{background:#2F5BA0;border-color:#2F5BA0;color:#fff}
+:root[data-theme="dark"] .btn.pri:hover,:root[data-theme="dark"] .btn.primary:hover{background:#3A69B2;border-color:#3A69B2}
+:root[data-theme="dark"] .side .btn.cta,:root[data-theme="dark"] .side .btn.cta:hover,:root[data-theme="dark"] .bn-new i{background:#A7232A!important;border-color:#A7232A!important;color:#fff!important}
+:root[data-theme="dark"] .pstep.p-teklif{background:#2F5BA0}
+:root[data-theme="dark"] .kpi.hot .v,:root[data-theme="dark"] .dli .late{color:#F08A8E}
+:root[data-theme="dark"] .mtop img{filter:brightness(1.9) saturate(.6)}
+:root[data-theme="dark"] .chip[aria-pressed="true"]{background:#2F5BA0;border-color:#2F5BA0}
+:root[data-theme="dark"] #save.dirty{border-color:#F08A8E;color:#F08A8E;box-shadow:inset 0 -2px 0 #F08A8E}
+@media (prefers-color-scheme:dark){
+:root:not([data-theme="light"]) .mtitle,:root:not([data-theme="light"]) .bn[aria-current="page"],:root:not([data-theme="light"]) .paneswitch button[aria-selected="true"]{color:#fff!important}
+:root:not([data-theme="light"]) .btn.pri,:root:not([data-theme="light"]) .btn.primary{background:#2F5BA0;border-color:#2F5BA0;color:#fff}
+:root:not([data-theme="light"]) .btn.pri:hover,:root:not([data-theme="light"]) .btn.primary:hover{background:#3A69B2;border-color:#3A69B2}
+:root:not([data-theme="light"]) .side .btn.cta,:root:not([data-theme="light"]) .side .btn.cta:hover,:root:not([data-theme="light"]) .bn-new i{background:#A7232A!important;border-color:#A7232A!important;color:#fff!important}
+:root:not([data-theme="light"]) .pstep.p-teklif{background:#2F5BA0}
+:root:not([data-theme="light"]) .kpi.hot .v,:root:not([data-theme="light"]) .dli .late{color:#F08A8E}
+:root:not([data-theme="light"]) .mtop img{filter:brightness(1.9) saturate(.6)}
+:root:not([data-theme="light"]) .chip[aria-pressed="true"]{background:#2F5BA0;border-color:#2F5BA0}
+:root:not([data-theme="light"]) #save.dirty{border-color:#F08A8E;color:#F08A8E;box-shadow:inset 0 -2px 0 #F08A8E}
+}
 /* --- telefon: odaklanınca sayfa büyümesin (iOS 16 px altındaki alanlarda yakınlaştırır), önizleme kaymasın --- */
 @media (max-width:900px){
   input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{font-size:16px!important}
