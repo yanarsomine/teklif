@@ -747,6 +747,17 @@ table.list th,.list th{font-size:11px;letter-spacing:.06em;text-transform:upperc
   .bn-new i{background:var(--brand);border-radius:8px}
   .more:not([hidden]){border-radius:8px}
 }
+/* --- telefon: odaklanınca sayfa büyümesin (iOS 16 px altındaki alanlarda yakınlaştırır), önizleme kaymasın --- */
+@media (max-width:900px){
+  input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{font-size:16px!important}
+  html,body{overflow-x:hidden}
+  body.modal-open{overflow:hidden;position:fixed;left:0;right:0}
+  .modal .mh{flex-wrap:wrap;row-gap:6px}
+  .modal .mh b{flex:1 1 100%}
+  .modal .mb{padding:12px 8px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  .modal:has(.pv){background:#2a3242}
+  .pv{gap:10px}
+}
 /* --- telefon düzeltmeleri --- */
 @media (max-width:980px){
   .it select,.it input,.it textarea{max-width:100%}
@@ -1539,14 +1550,17 @@ async function openPreview(){
   await pdfIdle();
   const {pages}=await buildPages();
   const m=document.createElement('div');m.className='modal';
-  const scale=Math.min(1,(window.innerWidth-40)/794);
+  const vw=Math.min(window.innerWidth,document.documentElement.clientWidth||window.innerWidth);
+  const scale=Math.min(1,(vw-(vw<700?16:40))/794);
   m.innerHTML=`<div class="mh"><b>Önizleme · ${pages.length} sayfa</b>${missingPrices()?`<span class="np">${missingPrices()} kalemde fiyat yok</span>`:''}<span style="flex:1"></span><button class="btn pri" id="mpdf">PDF indir</button><button class="btn" id="mclose">Kapat</button></div><div class="mb"><div class="pv"></div></div>`;
   document.body.appendChild(m);
   const pv=m.querySelector('.pv');
   pages.forEach(p=>{const box=document.createElement('div');box.className='pvp';box.style.width=794*scale+'px';box.style.height=1123*scale+'px';
     const c=p.cloneNode(true);c.style.transform=`scale(${scale})`;c.style.transformOrigin='0 0';box.appendChild(c);pv.appendChild(box)});
-  m.querySelector('#mclose').onclick=()=>m.remove();
-  m.querySelector('#mpdf').onclick=()=>{m.remove();makePDF()};
+  const y=window.scrollY;document.body.style.top=-y+'px';document.body.classList.add('modal-open');
+  const shut=()=>{m.remove();document.body.classList.remove('modal-open');document.body.style.top='';window.scrollTo(0,y)};
+  m.querySelector('#mclose').onclick=shut;
+  m.querySelector('#mpdf').onclick=()=>{shut();makePDF()};
 }
 let busy=false;
 /* PDF'in içine gömülen teklif özeti: teklif PDF'i müşteri dosyasına yüklendiğinde bilgiler buradan okunur */
