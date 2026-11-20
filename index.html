@@ -1517,8 +1517,8 @@ async function buildPages(){
     if(!fits(pg)){w.remove();pg=newPage(miniHead(no,'Fiyatlandırma (devam)'));pg.appendChild(w)}
   }
   pages.forEach((p,k)=>p.insertAdjacentHTML('beforeend',footHTML(k+1,pages.length)));
-  await Promise.all([...stage.querySelectorAll('img')].map(im=>new Promise(r=>{const fail=()=>{const fb=im.dataset.fb?'':imgFallback(im);if(fb){im.dataset.fb='1';im.onload=()=>r();im.onerror=()=>{im.remove();r()};im.src=fb}else{(im.closest('.p-drw')||im).remove();r()}};if(im.complete){im.naturalWidth?r():fail()}else{im.onload=()=>r();im.onerror=fail}})));
-  try{await document.fonts.ready}catch(e){}
+  await Promise.all([...stage.querySelectorAll('img')].map(im=>new Promise(r=>{setTimeout(()=>{if(!im.complete||!im.naturalWidth){im.onload=im.onerror=null;(im.closest('.p-drw')||im).remove()}r()},12000);const fail=()=>{const fb=im.dataset.fb?'':imgFallback(im);if(fb){im.dataset.fb='1';im.onload=()=>r();im.onerror=()=>{im.remove();r()};im.src=fb}else{(im.closest('.p-drw')||im).remove();r()}};if(im.complete){im.naturalWidth?r():fail()}else{im.onload=()=>r();im.onerror=fail}})));
+  try{await withTimeout(document.fonts.ready,4000,'Yazı tipleri')}catch(e){}
   return {pages,no};
 }
 function missingPrices(){return ALL().filter(i=>!Number(i.net)).length}
@@ -1567,11 +1567,15 @@ let busy=false;
 function pdfInfo(){const t=totals();const a=quoteAmount(t);
   return {id:Q.id||null,no:Q.no||'',date:Q.date,customer:{...Q.customer},customerId:Q.customerId||null,jobId:Q.jobId||null,offer:a,kdvHaric:NOVAT(),
     totals:Object.fromEntries(Object.entries(t).map(([c,x])=>[c,+x.total.toFixed(2)])),items:ALL().filter(i=>!i.pkg).map(i=>i.name).filter(Boolean).slice(0,30)}}
-async function renderPdfBlob(){
-  const {pages,no}=await buildPages();
+/* Hiçbir adım sonsuza kadar beklemesin: süre dolarsa hangi adımda kaldığı söylenir */
+function withTimeout(p,ms,what){let t;return Promise.race([p,new Promise((_,no)=>{t=setTimeout(()=>no(new Error(what+' çok uzun sürdü')),ms)})]).finally(()=>clearTimeout(t))}
+async function renderPdfBlob(prog){
+  prog&&prog('Sayfalar hazırlanıyor…');
+  const {pages,no}=await withTimeout(buildPages(),30000,'Sayfaların hazırlanması');
   const pdf=new jspdf.jsPDF({unit:'mm',format:'a4',compress:true});
   for(let k=0;k<pages.length;k++){
-    const cv=await html2canvas(pages[k],{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,width:794,height:1123,windowWidth:794});
+    prog&&prog(`PDF ${k+1}/${pages.length}…`);
+    const cv=await withTimeout(html2canvas(pages[k],{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,width:794,height:1123,windowWidth:794,imageTimeout:15000}),60000,`PDF sayfa ${k+1}`);
     if(k)pdf.addPage();
     pdf.addImage(cv.toDataURL('image/jpeg',0.86),'JPEG',0,0,210,297,undefined,'FAST');
     cv.width=cv.height=0;
@@ -1588,14 +1592,14 @@ function scheduleArchive(){
   clearTimeout(archTimer);
   archTimer=setTimeout(()=>{
     if(busy||archP||!archive||!Q.id)return;
-    archP=(async()=>{try{if(!await libs(true))return;const {blob}=await renderPdfBlob();await archivePdf(blob)}catch(e){console.warn(e)}})().finally(()=>{archP=null});
+    archP=(async()=>{try{if(!await libs(true))return;const {blob}=await renderPdfBlob();await withTimeout(archivePdf(blob),30000,'Arşiv')}catch(e){console.warn(e)}})().finally(()=>{archP=null});
   },1500);
 }
 /* Önizleme/PDF/Gönder öncesi: bekleyen arka plan arşivini bitir (aynı sayfa alanını kullanırlar) */
-async function pdfIdle(){clearTimeout(archTimer);if(archP){toast('PDF hazırlanıyor, bir saniye…',1800);try{await archP}catch(e){}}}
+async function pdfIdle(){clearTimeout(archTimer);if(archP){toast('PDF hazırlanıyor, bir saniye…',1800);try{await withTimeout(archP,20000,'Arşiv')}catch(e){archP=null}}}
 /* PDF kütüphaneleri ilk kullanımda yüklenir (açılışı hızlandırır) */
 let libsP=null;
-window.loadScript=loadScript;function loadScript(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error(src+' yüklenemedi'));document.head.appendChild(s)})}
+window.loadScript=loadScript;function loadScript(src){return withTimeout(new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error(src+' yüklenemedi'));document.head.appendChild(s)}),25000,'PDF araçlarının yüklenmesi')}
 async function libs(quiet){
   if(window.jspdf&&window.html2canvas)return true;
   libsP=libsP||Promise.all([window.html2canvas?0:loadScript('vendor/html2canvas.min.js'),window.jspdf?0:loadScript('vendor/jspdf.umd.min.js')]).catch(e=>{libsP=null;throw e});
@@ -1608,9 +1612,10 @@ async function sendWA(){
   if(!priceGate('Göndermeden'))return;
   const b=$('#wa');busy=true;b.disabled=true;const old=b.innerHTML;b.textContent='Hazırlanıyor…';
   try{
-    await pdfIdle();if(!await libs())return;
-    if(!document.body.classList.contains('ro')&&(!Q.id||isDirty())&&!await saveQuote(true,true)){toast('Teklif kaydedilemediği için gönderilmedi. Bağlantıyı kontrol edip tekrar deneyin.',5000);return}
-    const {blob,no}=await renderPdfBlob();archivePdf(blob);
+    const st=t=>{b.textContent=t};
+    await pdfIdle();st('Hazırlanıyor…');if(!await libs())return;
+    if(!document.body.classList.contains('ro')&&(!Q.id||isDirty())){st('Kaydediliyor…');if(!await withTimeout(saveQuote(true,true),25000,'Kayıt')){toast('Teklif kaydedilemediği için gönderilmedi. Bağlantıyı kontrol edip tekrar deneyin.',5000);return}}
+    const {blob,no}=await renderPdfBlob(st);archivePdf(blob);
     const nm=('Yanar Somine Teklif '+no+(Q.customer.name?' - '+Q.customer.name:'')).replace(/[\\/:*?"<>|]/g,'')+'.pdf';
     showSend(blob,nm,no);
   }catch(e){console.error(e);toast('PDF oluşturulamadı: '+(e?.message||e),5000)}
@@ -1652,10 +1657,11 @@ async function makePDF(){
   if(!priceGate('PDF oluşturmadan'))return;
   busy=true;$('#pdf').disabled=true;$('#pdf').textContent='PDF hazırlanıyor…';
   try{
+    const st=t=>{$('#pdf').textContent=t};
     await pdfIdle();if(!await libs())return;
     // Müşteriye giden PDF ile kayıt aynı olsun: önce kaydet, kayıt olmazsa PDF üretme
-    if(!document.body.classList.contains('ro')&&(!Q.id||isDirty())&&!await saveQuote(true,true)){toast('Teklif kaydedilemediği için PDF oluşturulmadı. Bağlantıyı kontrol edip tekrar deneyin.',5000);return}
-    const {blob,no}=await renderPdfBlob();
+    if(!document.body.classList.contains('ro')&&(!Q.id||isDirty())){st('Kaydediliyor…');if(!await withTimeout(saveQuote(true,true),25000,'Kayıt')){toast('Teklif kaydedilemediği için PDF oluşturulmadı. Bağlantıyı kontrol edip tekrar deneyin.',5000);return}}
+    const {blob,no}=await renderPdfBlob(st);
     archivePdf(blob);
     const nm=('Yanar Somine Teklif '+no+(Q.customer.name?' - '+Q.customer.name:'')).replace(/[\\/:*?"<>|]/g,'')+'.pdf';
     if(!downloads){toast('Bu görünümde dosya indirilemiyor. Sayfayı claude.ai üzerinden açın.',5000);return}

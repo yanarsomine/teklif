@@ -4,7 +4,11 @@
 (function () {
   const cfg = window.YS_CONFIG || {};
   const ready = !!(window.supabase && cfg.SUPABASE_URL && !/PROJE-KODU/.test(cfg.SUPABASE_URL));
-  const sb = ready ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+  // Ağ isteği asılı kalmasın: 60 sn içinde yanıt gelmezse hata verir (telefonda zayıf bağlantı)
+  const tfetch = (u, o = {}) => { const c = new AbortController(); const t = setTimeout(() => c.abort(), 60000);
+    if (o.signal) o.signal.addEventListener('abort', () => c.abort());
+    return fetch(u, { ...o, signal: c.signal }).finally(() => clearTimeout(t)); };
+  const sb = ready ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { global: { fetch: tfetch } }) : null;
   window.YS_SB = sb;
 
   let session = null, profile = null, resolveAuth;
