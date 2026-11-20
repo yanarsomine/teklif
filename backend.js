@@ -206,7 +206,9 @@
       if (error) throw fail(error);
       return true;
     },
-    async remove(id) { const { error } = await sb.storage.from('teklifler').remove([`${id}.pdf`]); if (error) throw fail(error); }
+    async remove(id) { const { error } = await sb.storage.from('teklifler').remove([`${id}.pdf`]); if (error) throw fail(error); },
+    /* Müşteriye gönderilecek süreli bağlantı (gün) — bağlantıyı bilen PDF'i açabilir */
+    async link(id, days) { const { data, error } = await sb.storage.from('teklifler').createSignedUrl(`${id}.pdf`, Math.round((days || 60) * 86400)); if (error) throw fail(error); return data.signedUrl; }
   };
 
   /* ---------- files (müşteri dosyaları: gizli "musteri-dosyalari" kovası, süreli imzalı bağlantıyla açılır) ---------- */
