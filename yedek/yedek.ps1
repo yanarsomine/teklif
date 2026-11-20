@@ -12,9 +12,10 @@ $Hedef  = Join-Path $Dir 'Yedekler'
 $VeriD  = Join-Path $Hedef 'Veri'
 $PdfD   = Join-Path $Hedef 'PDF'
 $MdD    = Join-Path $Hedef 'MusteriDosyalari'
+$UrD    = Join-Path $Hedef 'UrunResimleri'
 $Log    = Join-Path $Hedef 'yedek-gunlugu.txt'
 $Bugun  = Get-Date -Format 'yyyy-MM-dd'
-New-Item -ItemType Directory -Force -Path $VeriD, $PdfD, $MdD | Out-Null
+New-Item -ItemType Directory -Force -Path $VeriD, $PdfD, $MdD, $UrD | Out-Null
 
 function Yaz($m) { Add-Content -Path $Log -Value ("{0}  {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $m) -Encoding UTF8 }
 function Utf8($resp) { [Text.Encoding]::UTF8.GetString($resp.RawContentStream.ToArray()) }
@@ -69,8 +70,8 @@ try {
   # 2) Tüm kayıtlar (teklifler, müşteriler, fiyatlar, ayarlar…) — 1000'erli sayfalar, eksik inerse hata
   $parcalar = New-Object System.Collections.Generic.List[string]; $off = 0; $toplam = -1; $sayi = 0
   do {
-    $h = $H.Clone(); $h['Prefer'] = 'count=exact'
-    $r = Invoke-WebRequest -UseBasicParsing -Uri "$URL/rest/v1/docs?select=collection,id,data,updated_at&order=collection,id&limit=1000&offset=$off" -Headers $h
+    $hc = $script:H.Clone(); $hc['Prefer'] = 'count=exact'
+    $r = Invoke-WebRequest -UseBasicParsing -Uri "$URL/rest/v1/docs?select=collection,id,data,updated_at&order=collection,id&limit=1000&offset=$off" -Headers $hc
     $txt = Utf8 $r
     $part = @(($txt | ConvertFrom-Json) | ForEach-Object { $_ })
     $cr = [string]$r.Headers['Content-Range']; if ($cr -match '/(\d+)$') { $toplam = [int]$Matches[1] }
@@ -125,6 +126,13 @@ try {
       if (Indir 'musteri-dosyalari' $o $hed) { $yeniDosya++ }
     }
   } catch { $pdfHata += ' (müşteri dosyaları indirilemedi: ' + $_.Exception.Message + ')' }
+  try {
+    foreach ($o in (Liste 'uploads' '')) {
+      $hed = Join-Path $UrD ($o.yol -replace '/', '\')
+      New-Item -ItemType Directory -Force -Path (Split-Path -Parent $hed) | Out-Null
+      if (Indir 'uploads' $o $hed) { $yeniDosya++ }
+    }
+  } catch { $pdfHata += ' (ürün resimleri indirilemedi: ' + $_.Exception.Message + ')' }
 
   Yaz (("Tamam: {0} kayıt ({1} teklif, {2} müşteri), {3} yeni/değişen PDF, {4} yeni müşteri dosyası" -f $sayi, @($rows).Count, $musteri, $yeni, $yeniDosya) + $pdfHata)
   Bildir 'backup' @{ teklif = @($rows).Count; musteri = $musteri; pdf = $yeni; dosya = $yeniDosya; kayit = $sayi; not = $pdfHata.Trim() }

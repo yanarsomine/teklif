@@ -71,7 +71,7 @@ listele() {  # kova onek -> "yol|epoch|touch" satırları (alt klasörler dahil)
     js nesneler "$TMP/l.json" "$2" > "$F"
     while IFS='|' read -r TUR YOL EP TS; do
       [ -n "$YOL" ] || continue
-      if [ "$TUR" = "D" ]; then listele "$1" "$YOL"; else echo "$YOL|$EP|$TS"; fi
+      if [ "$TUR" = "D" ]; then listele "$1" "$YOL" < /dev/null; else echo "$YOL|$EP|$TS"; fi
     done < "$F"
     [ "$N" -eq 1000 ] || break
     OFF=$((OFF + 1000))
@@ -81,14 +81,19 @@ YENI=0; YENIDOSYA=0; PDFHATA=""
 listele teklifler "" > "$TMP/pdfler.txt"
 while IFS='|' read -r YOL EP TS; do
   case "$YOL" in *.pdf) ;; *) continue ;; esac
-  YEREL="$(js pdfad "$YOL" "$TMP/teklifler.json")"
-  indir teklifler "$YOL" "$PDF/$YEREL" "$EP" "$TS" && YENI=$((YENI + 1))
+  YEREL="$(js pdfad "$YOL" "$TMP/teklifler.json" < /dev/null)"
+  indir teklifler "$YOL" "$PDF/$YEREL" "$EP" "$TS" < /dev/null && YENI=$((YENI + 1))
 done < "$TMP/pdfler.txt"
 listele musteri-dosyalari "" > "$TMP/dosyalar.txt"
 while IFS='|' read -r YOL EP TS; do
   [ -n "$YOL" ] || continue
-  indir musteri-dosyalari "$YOL" "$HEDEF/MusteriDosyalari/$YOL" "$EP" "$TS" && YENIDOSYA=$((YENIDOSYA + 1))
+  indir musteri-dosyalari "$YOL" "$HEDEF/MusteriDosyalari/$YOL" "$EP" "$TS" < /dev/null && YENIDOSYA=$((YENIDOSYA + 1))
 done < "$TMP/dosyalar.txt"
+listele uploads "" > "$TMP/resimler.txt"
+while IFS='|' read -r YOL EP TS; do
+  [ -n "$YOL" ] || continue
+  indir uploads "$YOL" "$HEDEF/UrunResimleri/$YOL" "$EP" "$TS" < /dev/null && YENIDOSYA=$((YENIDOSYA + 1))
+done < "$TMP/resimler.txt"
 
 yaz "Tamam: $SAYI kayıt ($ADET teklif, $MUSTERI müşteri), $YENI yeni/değişen PDF, $YENIDOSYA yeni müşteri dosyası$PDFHATA"
 bildir backup "$ADET" "$MUSTERI" "$YENI" "$PDFHATA" "$YENIDOSYA" "$SAYI"

@@ -1133,10 +1133,10 @@ function pkgItem(){const k=Q.pkg;if(!k||!k.on)return null;
   return {k:'pkg',pkg:true,code:null,name:k.title||svcTitle(),desc,qty:1,unit:'paket',net:Number(k.net)||0,vat:k.vat||'excl',cur:k.cur||'TRY',disc:0}}
 function svcTitle(){const sv=(Q.pkg?.svc||[]);if(!sv.length)return 'Paket hizmet';return (sv.length>1?sv.slice(0,-1).join(', ')+' ve '+sv[sv.length-1]:sv[0])+' (paket fiyat)'}
 function ALL(){const p=pkgItem();const it=Q.items.filter(i=>i.code||(i.name||'').trim()||Number(i.net));return p?it.concat([p]):it}
-function lineNet(i){return r2((Number(i.net)||0)*(Number(i.qty)||0)*(1-(Number(i.disc)||0)/100))}
+function lineNet(i){return (Number(i.net)||0)*(Number(i.qty)||0)*(1-(Number(i.disc)||0)/100)}
 function totals(){
-  const g={};CURORDER.forEach(c=>{if(ALL().some(i=>i.cur===c))g[c]={gross:0,disc:0,net:0}});ALL().forEach(i=>{const t=g[i.cur]||(g[i.cur]={gross:0,disc:0,net:0});const raw=r2((Number(i.net)||0)*(Number(i.qty)||0));t.gross+=raw;t.disc+=raw-lineNet(i);t.net+=lineNet(i)});
-  Object.values(g).forEach(t=>{t.gross=r2(t.gross);t.disc=r2(t.disc);t.net=r2(t.net);t.vat=NOVAT()?0:r2(t.net*VATR()/100);t.total=r2(t.net+t.vat)});
+  const g={};CURORDER.forEach(c=>{if(ALL().some(i=>i.cur===c))g[c]={gross:0,disc:0,net:0}});ALL().forEach(i=>{const t=g[i.cur]||(g[i.cur]={gross:0,disc:0,net:0});const raw=(Number(i.net)||0)*(Number(i.qty)||0);t.gross+=raw;t.disc+=raw-lineNet(i);t.net+=lineNet(i)});
+  Object.values(g).forEach(t=>{const nr=t.net;t.gross=r2(t.gross);t.disc=r2(t.disc);t.net=r2(nr);t.total=NOVAT()?t.net:r2(nr*VR());t.vat=r2(t.total-t.net)});
   return g;
 }
 function ltHTML(i){const n=lineNet(i);return `${!Number(i.net)?'<span class="np">Fiyat girin</span><br>':''}${fmt(showP(n,i),i.cur)}<div class="note" style="font-weight:400">${incl(i)?'KDV hariç '+fmt(n,i.cur):'KDV dahil '+fmt(n*VR(),i.cur)}</div>`}
@@ -1228,8 +1228,8 @@ function rateNote(){const el=$('#q-ratenote');if(!el)return;
   let t='';
   if(Q.rateManual)t=`Kurlar elle girildi. ${RATE?`<a href="#" id="userate">Güncel TCMB kurunu kullan (€ ${esc(rTxt(RATE.eur))} · $ ${esc(rTxt(RATE.usd))}, ${esc(trDate(RATE.date))})</a>`:''}`;
   else if(Q.rateDate)t=`TCMB döviz satış kuru · ${esc(trDate(Q.rateDate))}`;
-  if(RATE&&RATE.date){const age=Math.floor((Date.now()-new Date(RATE.date+'T12:00:00'))/864e5);if(age>4)t=`<span class="np">Otomatik kur ${age} gündür güncellenmedi (son: ${esc(trDate(RATE.date))}). Kuru kontrol edin.</span> `+t}
   else t=`Otomatik kur henüz gelmedi; kuru elle girebilirsiniz (${link}).`;
+  if(RATE&&RATE.date){const age=Math.floor((Date.now()-new Date(RATE.date+'T12:00:00'))/864e5);if(age>4)t=`<span class="np">Otomatik kur ${age} gündür güncellenmedi (son: ${esc(trDate(RATE.date))}). Kuru kontrol edin.</span> `+t}
   if(Q.id&&!Q.rateManual&&RATE&&RATE.date!==Q.rateDate)t+=` · <a href="#" id="userate">Bugünkü kurla güncelle</a>`;
   el.innerHTML=(miss.length?`<span class="np">${miss.map(c=>CURN[c]).join(' ve ')} kuru eksik.</span> `:'')+t;
   const u=$('#userate');if(u)u.onclick=e=>{e.preventDefault();applyRate(true)}}
@@ -1595,7 +1595,7 @@ async function sendWA(){
   const b=$('#wa');busy=true;b.disabled=true;const old=b.innerHTML;b.textContent='Hazırlanıyor…';
   try{
     await pdfIdle();if(!await libs())return;
-    if(!document.body.classList.contains('ro')&&!await saveQuote(true,true)){toast('Teklif kaydedilemediği için gönderilmedi. Bağlantıyı kontrol edip tekrar deneyin.',5000);return}
+    if(!document.body.classList.contains('ro')&&(!Q.id||isDirty())&&!await saveQuote(true,true)){toast('Teklif kaydedilemediği için gönderilmedi. Bağlantıyı kontrol edip tekrar deneyin.',5000);return}
     const {blob,no}=await renderPdfBlob();archivePdf(blob);
     const nm=('Yanar Somine Teklif '+no+(Q.customer.name?' - '+Q.customer.name:'')).replace(/[\\/:*?"<>|]/g,'')+'.pdf';
     showSend(blob,nm,no);
@@ -1640,7 +1640,7 @@ async function makePDF(){
   try{
     await pdfIdle();if(!await libs())return;
     // Müşteriye giden PDF ile kayıt aynı olsun: önce kaydet, kayıt olmazsa PDF üretme
-    if(!document.body.classList.contains('ro')&&!await saveQuote(true,true)){toast('Teklif kaydedilemediği için PDF oluşturulmadı. Bağlantıyı kontrol edip tekrar deneyin.',5000);return}
+    if(!document.body.classList.contains('ro')&&(!Q.id||isDirty())&&!await saveQuote(true,true)){toast('Teklif kaydedilemediği için PDF oluşturulmadı. Bağlantıyı kontrol edip tekrar deneyin.',5000);return}
     const {blob,no}=await renderPdfBlob();
     archivePdf(blob);
     const nm=('Yanar Somine Teklif '+no+(Q.customer.name?' - '+Q.customer.name:'')).replace(/[\\/:*?"<>|]/g,'')+'.pdf';
@@ -1699,7 +1699,7 @@ async function _saveQuote(silent,noArchive){
           const ch=await conflictDlg(cur.no);
           if(ch==='reload'){await openQuote(cur.id,true);return false}
           if(ch!=='rev')return false;
-          cur.revBase=cur.revBase||cur.no;cur.revOf=cur.id;cur.id=null;cur.no='';delete cur.rev;NEWQ(cur);cur.olusturma=null;
+          const vr=cur.vatRate;cur.revBase=cur.revBase||cur.no;cur.revOf=cur.id;cur.id=null;cur.no='';delete cur.rev;NEWQ(cur);cur.vatRate=vr;cur.olusturma=null;
           return await _saveQuote(silent,noArchive);
         }
       }
@@ -1971,7 +1971,7 @@ async function newQuoteFor(c,j){
 }
 function baseSig(q){const {customerId,jobId,newJob,noLink,_ts,_base,updatedAt,guncelleyen,guncelleyenId,totals,offer,...x}=q||{};return JSON.stringify(x)}
 async function openQuote(id,force){
-  if(!(Q&&Q.id===id&&!force)&&!await confirmLeave())return;
+  if(!force&&!await confirmLeave())return;
   const src=QALL.find(x=>x.id===id);if(!src){toast('Teklif bulunamadı');return}
   Q=JSON.parse(JSON.stringify(src));{const mv=Q.opts?.vat==='incl'?'incl':'excl';Q.items.forEach(i=>{if(!i.vat)i.vat=mv})}
   if(Q.vatRate==null)Q.vatRate=Number(S.vat)||0;
@@ -2140,7 +2140,7 @@ function renderBkp(){
     const hm=d.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});
     return d.toDateString()===td.toDateString()?'bugün '+hm:d.toDateString()===y.toDateString()?'dün '+hm:d.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+hm};
   const okAt=BKP?.zaman?new Date(BKP.zaman):null,erAt=BKPERR?.zaman?new Date(BKPERR.zaman):null;
-  const info=BKP?`${esc(BKP.bilgisayar||'')}${BKP.sistem?' ('+esc(BKP.sistem)+')':''} · ${BKP.teklif??'?'} teklif${BKP.musteri!=null?', '+BKP.musteri+' müşteri':''}`:'';
+  const info=BKP?`${esc(BKP.bilgisayar||'')}${BKP.sistem?' ('+esc(BKP.sistem)+')':''} · ${esc(BKP.teklif??'?')} teklif${BKP.musteri!=null?', '+esc(BKP.musteri)+' müşteri':''}`:'';
   let cls='',h,n='';
   if(!BKP&&!BKPERR){cls='warn';h='Gün sonu yedeğinden henüz bilgi gelmedi.';n='Yedek alan bilgisayardaki yedek programını yeni sürümüyle değiştirin; ilk yedekten sonra durum burada görünür.'}
   else if(erAt&&(!okAt||erAt>okAt)){cls='err';h=`Son yedek denemesi başarısız oldu (${when(BKPERR.zaman)}${BKPERR.bilgisayar?' · '+esc(BKPERR.bilgisayar):''}).`;n=esc(BKPERR.hata||'')+(okAt?` · Son başarılı yedek: ${when(BKP.zaman)}`:'')}
@@ -2180,7 +2180,7 @@ async function connect(){
   db.doc('counter/backup').onSnapshot(s=>{BKP=s.exists?s.data():null;renderBkp()},()=>{});
   db.doc('counter/backup-err').onSnapshot(s=>{BKPERR=s.exists?s.data():null;renderBkp()},()=>{});
   db.doc('counter/quotes').onSnapshot(s=>{NEXTNO=s.exists?Number(s.data().next)||0:0},()=>{});
-  db.doc('config/settings').onSnapshot(s=>{if(s.exists){S={...DEFAULT_SETTINGS,...s.data()};if(/Ltd\.? ?Şti/i.test(S.title||''))S.title='Yanar Şömine';if(/başarılar dileriz/.test(S.notes||''))S.notes=DEFAULT_SETTINGS.notes;S.xnotes=String(S.xnotes||'').replace('Alçı, sıva ve boya işleri fiyata dahil değildir.','Alçı, sıva ve boya işleri firmamıza ait değildir.').replace('Çatı bacası çevresindeki su yalıtımı fiyata dahil değildir.','Çatı bacası çevresindeki su yalıtımı firmamıza ait değildir.');if(Q)renderItems();if(!$('#v-ayarlar').hidden)fillSettings()}},()=>{});
+  db.doc('config/settings').onSnapshot(s=>{if(s.exists){S={...DEFAULT_SETTINGS,...s.data()};if(Q&&!Q.id&&Number(Q.vatRate)!==Number(S.vat)){Q.vatRate=Number(S.vat)||0;ls.set('ys-draft',Q)}if(/Ltd\.? ?Şti/i.test(S.title||''))S.title='Yanar Şömine';if(/başarılar dileriz/.test(S.notes||''))S.notes=DEFAULT_SETTINGS.notes;S.xnotes=String(S.xnotes||'').replace('Alçı, sıva ve boya işleri fiyata dahil değildir.','Alçı, sıva ve boya işleri firmamıza ait değildir.').replace('Çatı bacası çevresindeki su yalıtımı fiyata dahil değildir.','Çatı bacası çevresindeki su yalıtımı firmamıza ait değildir.');if(Q)renderItems();if(!$('#v-ayarlar').hidden)fillSettings()}},()=>{});
   db.collection('overrides').onSnapshot(s=>{OVR={};s.docs.forEach(d=>{const x=d.data();OVR[x.code]=x});buildProducts();renderCats();renderGrid();if(Q)renderItems();if(!$('#v-urunler').hidden&&!document.activeElement?.closest('#plist'))renderPAdmin()},()=>connErr(true,'Fiyatlar'));
   db.collection('custom').onSnapshot(s=>{CUSTOM={};s.docs.forEach(d=>{const x=d.data();CUSTOM[x.code]=x});buildProducts();renderCats();renderGrid();if(!$('#v-urunler').hidden)renderPAdmin();setStatus(P.length+' ürün · kayıtlar bağlı','on')},()=>connErr(true,'Özel ürünler'));
   db.collection('quotes').onSnapshot(s=>{QALL=s.docs.map(d=>({id:d.id,...d.data(),_ts:d.updatedAt})).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));QUOTES=QALL.filter(x=>!x.silindi);

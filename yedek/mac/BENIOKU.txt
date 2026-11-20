@@ -30,7 +30,7 @@ GÜNCELLEME (Kasım 2026)
 GÜNCELLEME 2 (20 Kasım 2026)
 - Yedek artık programdaki TÜM kayıtları alır: teklifler, müşteriler, programdan girilen fiyatlar ve ayarlar
   (Veri/tum-veri-TARİH.json). Kayıt sayısı sunucudakiyle tutmazsa yedek "HATA" yazar.
-- Müşterilere yüklenen dosyalar (keşif çizimleri, fotoğraflar, PDF'ler) de iner: Yedekler/MusteriDosyalari.
+- Müşterilere yüklenen dosyalar (keşif çizimleri, fotoğraflar, PDF'ler) ve programdan yüklenen ürün resimleri de iner (UrunResimleri): Yedekler/MusteriDosyalari.
 - Güncellemek için: yeni dosyaları kurulum klasöründekilerin üzerine kopyalayın (Mac: Kurulum.command'ı yeniden açın).
 - Yedek için ayrı bir kullanıcı (ör. yedek@...) açıp personel olarak onaylamanız önerilir; kendi şifrenizi bu bilgisayarda saklamamış olursunuz.
 

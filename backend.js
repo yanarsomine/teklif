@@ -89,7 +89,7 @@
       else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') chanOk = false;
     });
   }
-  const wake = () => { if (document.visibilityState === 'visible' && Date.now() - lastFull > 5000) refreshAll(); };
+  const wake = () => { if (document.visibilityState === 'visible' && Date.now() - lastFull > 30000) refreshAll(); };
   document.addEventListener('visibilitychange', wake);
   window.addEventListener('online', () => { lastFull = 0; wake(); });
   window.addEventListener('pageshow', e => { if (e.persisted) wake(); });
