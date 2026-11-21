@@ -1154,7 +1154,7 @@ function addItem(code,vi){
 const MONCAT='Baca ve Montaj Ekipmanları';
 /* Montaj malzemesi: eski 'Baca ve Montaj Ekipmanları' kategorisi ya da mon:true (artık 'Baca ve Isı Odası Uygulamaları' altında) */
 const isMon=p=>!!p&&(p.cat===MONCAT||p.mon===true);
-const PKGIMGS=[{src:'img/montaj/duz-camli.jpg',label:'Düz camlı hazne – A1 yanmaz levha ısı odası'},{src:'img/montaj/kose-camli.jpg',label:'Köşe camlı hazne – A1 yanmaz levha ısı odası'},{src:'img/montaj/kose-camli-bitmis.jpg',label:'Köşe camlı hazne – bitmiş ısı odası, alt ve üst menfezli'}];
+const PKGIMGS=[{src:'img/montaj/duz-camli.jpg',label:'Düz camlı hazne – ısı odası kesiti'},{src:'img/montaj/kose-camli.jpg',label:'Köşe camlı hazne – ısı odası kesiti'},{src:'img/montaj/kose-camli-bitmis.jpg',label:'Köşe camlı hazne – bitmiş ısı odası, alt ve üst menfezli'}];
 const VR=()=>1+VATR()/100, incl=i=>(i?.vat||'excl')==='incl', NOVAT=()=>Q.opts.addVat===false&&!ALL().some(incl);
 const showP=(n,i)=>incl(i)?n*VR():n, fromP=(v,i)=>incl(i)?v/VR():v, modeLbl=i=>incl(i)?'KDV dahil':'KDV hariç';
 function totRows(x,c){const d=x.disc>0.004?`<div class="r"><span>Liste toplamı (KDV hariç)</span><span>${fmt(x.gross,c)}</span></div><div class="r"><span>İskonto</span><span>−${fmt(x.disc,c)}</span></div>`:'';
@@ -1463,7 +1463,7 @@ function custHTML(){const c=Q.customer;return `<div class="d-meta">
 function pkgPageHTML(no){const k=Q.pkg,ims=(k.imgs||[]).slice(0,4);const lab=u=>(PKGIMGS.find(g=>g.src===u)||{}).label||'';
   const h=ims.length===1?620:ims.length===2?400:300,cols=ims.length===1?1:2;
   return `${miniHead(no,'Montaj uygulaması')}
-  <div><div class="p-sub">${esc((k.svc||[]).join(' · ')||'Montaj')}</div><div class="p-name">${esc(k.title||svcTitle())}</div>
+  <div><div class="p-sub">${esc((k.svc||[]).join(' · ')||'Isı odası')}</div><div class="p-name">${esc(k.title||svcTitle())}</div>
    ${k.desc?`<div class="p-desc">${esc(k.desc)}</div>`:''}<div class="p-desc" style="color:#5d5452">Aşağıdaki görseller, şöminenizin ısı odası ve kaplama uygulamasının nasıl yapılacağını göstermektedir.</div></div>
   <div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:14px">${ims.map(u=>`<figure style="margin:0;display:flex;flex-direction:column;gap:6px"><div class="p-img" style="height:${h}px"><img src="${esc(u)}" alt=""></div>${lab(u)?`<figcaption style="font-size:10.5px;color:#5d5452;text-align:center">${esc(lab(u))}</figcaption>`:''}</figure>`).join('')}</div>`}
 function monCard(i){const p=PIDX[i.code];const img=i.cimg||itemImg(i);
