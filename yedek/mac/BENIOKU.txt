@@ -34,3 +34,15 @@ GÜNCELLEME 2 (20 Kasım 2026)
 - Güncellemek için: yeni dosyaları kurulum klasöründekilerin üzerine kopyalayın (Mac: Kurulum.command'ı yeniden açın).
 - Yedek için ayrı bir kullanıcı (ör. yedek@...) açıp personel olarak onaylamanız önerilir; kendi şifrenizi bu bilgisayarda saklamamış olursunuz.
 
+YEDEK KLASÖRÜ DÜZENİ (21 Kasım 2026)
+Yedekler/Müşteriler/<Müşteri adı>/
+    Teklifler   — o müşteriye verilen teklif PDF'leri (teklif numarasıyla)
+    Resimler    — müşteriye eklenen fotoğraflar
+    Keşif       — keşif çizimleri / dosyaları
+    Belgeler    — diğer belgeler
+    Müşteri bilgileri.txt — telefon, adres, işler ve notlar
+Yedekler/Müşteriler/_Müşteri dosyası olmayan teklifler — müşteri dosyasına bağlanmamış teklifler
+Yedekler/Veri — programın tüm kayıtları (tum-veri-TARİH.json) ve teklif listesi (Excel/CSV)
+Yedekler/UrunResimleri — programdan yüklenen ürün resimleri
+Eski sürümün oluşturduğu "PDF" ve "MusteriDosyalari" klasörleri artık kullanılmıyor; isterseniz silebilirsiniz.
+

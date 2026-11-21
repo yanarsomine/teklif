@@ -10,12 +10,10 @@ $URL    = 'https://kxwhxjwurzyhtdvcumap.supabase.co'
 $KEY    = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4d2h4and1cnp5aHRkdmN1bWFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM3MTkyMTgsImV4cCI6MjEwOTI5NTIxOH0.-kMYzLUElYFE6TvcdjS76Fk8WKFM8Wjz6xDpNEtBCis'
 $Hedef  = Join-Path $Dir 'Yedekler'
 $VeriD  = Join-Path $Hedef 'Veri'
-$PdfD   = Join-Path $Hedef 'PDF'
-$MdD    = Join-Path $Hedef 'MusteriDosyalari'
 $UrD    = Join-Path $Hedef 'UrunResimleri'
 $Log    = Join-Path $Hedef 'yedek-gunlugu.txt'
 $Bugun  = Get-Date -Format 'yyyy-MM-dd'
-New-Item -ItemType Directory -Force -Path $VeriD, $PdfD, $MdD, $UrD | Out-Null
+New-Item -ItemType Directory -Force -Path $VeriD, $UrD | Out-Null
 
 function Yaz($m) { Add-Content -Path $Log -Value ("{0}  {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $m) -Encoding UTF8 }
 function Utf8($resp) { [Text.Encoding]::UTF8.GetString($resp.RawContentStream.ToArray()) }
@@ -29,7 +27,8 @@ function Bildir($id, $veri) {
     Invoke-WebRequest -UseBasicParsing -Method Post -Uri "$URL/rest/v1/docs" -Headers $h -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($b)) | Out-Null
   } catch { }
 }
-function Temiz($s) { ($s -replace '[\\/:*?"<>|]', '').Trim() }
+function Temiz($s) { (($s -replace '[\\/:*?"<>|]', '') -replace '\s+', ' ').Trim() }
+$DURUM = @{ yeni = 'Yeni talep'; plan = 'Keşif planlandı'; kesif = 'Keşif yapıldı'; teklif = 'Teklif verildi'; satis = 'Satış oldu'; vazgecti = 'Vazgeçti' }
 function Liste($kova, $onek) {
   # Kovadaki tüm dosyalar (alt klasörler dahil), 1000'erli sayfalar
   $out = @(); $off = 0
@@ -107,25 +106,65 @@ try {
   $csv = ($liste | ConvertTo-Csv -NoTypeInformation -Delimiter ';') -join "`r`n"
   [IO.File]::WriteAllText((Join-Path $VeriD "teklif-listesi-$Bugun.csv"), $csv, (New-Object Text.UTF8Encoding $true))
 
-  # 3) Dosyalar: teklif PDF'leri ve müşteri dosyaları (keşif çizimleri, fotoğraflar…) — yalnız yeni/değişenler
-  $ad = @{}; foreach ($x in $rows) { $ad[$x.id] = $x.data.customer.name }
-  $yeni = 0; $yeniDosya = 0; $pdfHata = ''
-  try {
-    foreach ($o in (Liste 'teklifler' '')) {
-      if (-not $o.yol.EndsWith('.pdf')) { continue }
-      $id = $o.yol.Substring(0, $o.yol.Length - 4)
-      $m = Temiz ([string]$ad[$id])
-      $dosya = if ($m) { "$id - $m.pdf" } else { "$id.pdf" }
-      if (Indir 'teklifler' $o (Join-Path $PdfD $dosya)) { $yeni++ }
+  # 3) Müşteri klasörleri: Yedekler\Müşteriler\<Müşteri adı>\ Teklifler · Resimler · Belgeler · Keşif + Müşteri bilgileri.txt
+  #    (yalnız yeni/değişen dosyalar iner; çöp kutusundakiler alınmaz)
+  $MusD = Join-Path $Hedef 'Müşteriler'
+  $yeni = 0; $yeniDosya = 0; $eksik = 0; $pdfHata = ''
+  $custs = @($tum | Where-Object { $_.collection -eq 'musteriler' -and -not $_.data.silindi })
+  $say = @{}; foreach ($c in $custs) { $k = (Temiz ([string]$c.data.ad)).ToLower(); $say[$k] = 1 + [int]$say[$k] }
+  $kl = @{}
+  foreach ($c in $custs) {
+    $n = Temiz ([string]$c.data.ad); $tek = $n -and $say[$n.ToLower()] -eq 1; if (-not $n) { $n = 'İsimsiz müşteri' }
+    if (-not $tek) { $n = "$n - $(if ($c.data.kod) { Temiz ([string]$c.data.kod) } else { $c.id.Substring(0, [Math]::Min(6, $c.id.Length)) })" }
+    $kl[$c.id] = $n
+    $cd = Join-Path $MusD $n; New-Item -ItemType Directory -Force -Path $cd | Out-Null
+    $d = $c.data
+    $bilgi = @("Müşteri: $($d.ad)", "Telefon: $($d.telefon)", "E-posta: $($d.eposta)", "Adres: $((@($d.adres, $d.ilce, $d.il) | Where-Object { $_ }) -join ', ')", '', 'İşler:')
+    foreach ($j in @($d.isler)) { if ($j -and -not $j.silindi) { $bilgi += "- $($j.baslik)  [$(if ($DURUM[[string]$j.durum]) { $DURUM[[string]$j.durum] } else { $j.durum })]$(if ($j.kesifTarihi) { '  keşif: ' + $j.kesifTarihi })$(if ($j.sonTeklif -and $j.sonTeklif.no) { '  son teklif: ' + $j.sonTeklif.no })" } }
+    if ($d.notlar) { $bilgi += ''; $bilgi += "Notlar: $($d.notlar)" }
+    $bilgi += ''; $bilgi += "Yedek tarihi: $(Get-Date -Format 'dd.MM.yyyy HH:mm')"
+    [IO.File]::WriteAllText((Join-Path $cd 'Müşteri bilgileri.txt'), ($bilgi -join "`r`n"), (New-Object Text.UTF8Encoding $true))
+  }
+  $kullanilan = @{}
+  function Yer($klasor, $ad, $anahtar) {
+    # Aynı klasörde aynı adlı iki dosya olursa ikincisine kısa ek koyar
+    $y = Join-Path $klasor $ad
+    if ($kullanilan.ContainsKey($y.ToLower()) -and $kullanilan[$y.ToLower()] -ne $anahtar) {
+      $y = Join-Path $klasor ("{0} ({1}){2}" -f [IO.Path]::GetFileNameWithoutExtension($ad), $anahtar.Substring(0, [Math]::Min(5, $anahtar.Length)), [IO.Path]::GetExtension($ad))
     }
-  } catch { $pdfHata += ' (PDF indirilemedi: ' + $_.Exception.Message + ')' }
-  try {
-    foreach ($o in (Liste 'musteri-dosyalari' '')) {
-      $hed = Join-Path $MdD ($o.yol -replace '/', '\')
-      New-Item -ItemType Directory -Force -Path (Split-Path -Parent $hed) | Out-Null
-      if (Indir 'musteri-dosyalari' $o $hed) { $yeniDosya++ }
-    }
-  } catch { $pdfHata += ' (müşteri dosyaları indirilemedi: ' + $_.Exception.Message + ')' }
+    $kullanilan[$y.ToLower()] = $anahtar; return $y
+  }
+  function Getir($kova, $uzak, $yerel, $zaman) {
+    # Yerelde yoksa (ya da sunucudaki daha yeniyse) indirir; indirdiyse $true, sunucuda yoksa $null
+    $uz = if ($zaman -is [datetime]) { $zaman } elseif ($zaman) { [datetime]::Parse([string]$zaman, [Globalization.CultureInfo]::InvariantCulture).ToLocalTime() } else { $null }
+    if (Test-Path -LiteralPath $yerel) { if (-not $uz -or (Get-Item -LiteralPath $yerel).LastWriteTime -ge $uz.AddSeconds(-2)) { return $false } }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $yerel) | Out-Null
+    $enc = ($uzak -split '/' | ForEach-Object { [uri]::EscapeDataString($_) }) -join '/'
+    $tmp = "$yerel.indiriliyor"
+    try { Invoke-WebRequest -UseBasicParsing -Uri "$URL/storage/v1/object/$kova/$enc" -Headers $script:H -OutFile $tmp }
+    catch { if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force }; return $null }
+    Move-Item -LiteralPath $tmp -Destination $yerel -Force
+    if ($uz) { (Get-Item -LiteralPath $yerel).LastWriteTime = $uz }
+    return $true
+  }
+  # Teklif PDF'leri (programın kaydettiği hâliyle)
+  foreach ($q in ($rows | Where-Object { -not $_.data.silindi })) {
+    $cid = $q.data.customerId
+    $kl2 = if ($cid -and $kl[$cid]) { $kl[$cid] } else { '_Müşteri dosyası olmayan teklifler\' + $(if (Temiz ([string]$q.data.customer.name)) { Temiz ([string]$q.data.customer.name) } else { 'İsimsiz' }) }
+    $dosya = Temiz ([string]$q.data.no); if (-not $dosya) { $dosya = $q.id }
+    $r2 = Getir 'teklifler' "$($q.id).pdf" (Yer (Join-Path (Join-Path $MusD $kl2) 'Teklifler') "$dosya.pdf" $q.id) $q.updated_at
+    if ($r2 -eq $true) { $yeni++ } elseif ($null -eq $r2) { $eksik++ }
+  }
+  # Müşteriye eklenen resimler ve belgeler (asıl dosya adlarıyla)
+  foreach ($f in ($tum | Where-Object { $_.collection -like 'musteriler/*/dosyalar' -and -not $_.data.silindi -and $_.data.assetId })) {
+    $cid = ($f.collection -split '/')[1]; if (-not $kl[$cid]) { continue }
+    $alt = switch ([string]$f.data.tur) { 'foto' { 'Resimler' } 'teklif' { 'Teklifler' } 'kesif' { 'Keşif' } default { 'Belgeler' } }
+    $ad = Temiz ([string]$f.data.ad); if (-not $ad) { $ad = Split-Path -Leaf $f.data.assetId }
+    if (-not [IO.Path]::GetExtension($ad)) { $ad += [IO.Path]::GetExtension([string]$f.data.assetId) }
+    $r2 = Getir 'musteri-dosyalari' ([string]$f.data.assetId) (Yer (Join-Path (Join-Path $MusD $kl[$cid]) $alt) $ad $f.id) $null
+    if ($r2 -eq $true) { $yeniDosya++ } elseif ($null -eq $r2) { $eksik++ }
+  }
+  if ($eksik) { $pdfHata += " ($eksik dosya sunucuda bulunamadı)" }
   try {
     foreach ($o in (Liste 'uploads' '')) {
       $hed = Join-Path $UrD ($o.yol -replace '/', '\')
@@ -134,7 +173,7 @@ try {
     }
   } catch { $pdfHata += ' (ürün resimleri indirilemedi: ' + $_.Exception.Message + ')' }
 
-  Yaz (("Tamam: {0} kayıt ({1} teklif, {2} müşteri), {3} yeni/değişen PDF, {4} yeni müşteri dosyası" -f $sayi, @($rows).Count, $musteri, $yeni, $yeniDosya) + $pdfHata)
+  Yaz (("Tamam: {0} kayıt ({1} teklif, {2} müşteri), {3} yeni/değişen teklif PDF'i, {4} yeni dosya" -f $sayi, @($rows).Count, $musteri, $yeni, $yeniDosya) + $pdfHata)
   Bildir 'backup' @{ teklif = @($rows).Count; musteri = $musteri; pdf = $yeni; dosya = $yeniDosya; kayit = $sayi; not = $pdfHata.Trim() }
 } catch {
   Yaz ("HATA: " + $_.Exception.Message)

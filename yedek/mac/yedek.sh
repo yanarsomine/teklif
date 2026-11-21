@@ -4,9 +4,9 @@
 DIR="$HOME/YanarYedek"
 URL='https://kxwhxjwurzyhtdvcumap.supabase.co'
 KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4d2h4and1cnp5aHRkdmN1bWFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM3MTkyMTgsImV4cCI6MjEwOTI5NTIxOH0.-kMYzLUElYFE6TvcdjS76Fk8WKFM8Wjz6xDpNEtBCis'
-HEDEF="$DIR/Yedekler"; VERI="$HEDEF/Veri"; PDF="$HEDEF/PDF"; LOG="$HEDEF/yedek-gunlugu.txt"
+HEDEF="$DIR/Yedekler"; VERI="$HEDEF/Veri"; LOG="$HEDEF/yedek-gunlugu.txt"
 JS="$DIR/yardimci.js"; TMP="$(mktemp -d)"; BUGUN="$(date +%Y-%m-%d)"
-mkdir -p "$VERI" "$PDF"
+mkdir -p "$VERI"
 yaz() { echo "$(date '+%Y-%m-%d %H:%M')  $1" >> "$LOG"; }
 js() { osascript -l JavaScript "$JS" "$@"; }
 mkdir "$DIR/.kilit" 2>/dev/null || { [ -n "$(find "$DIR/.kilit" -mmin +60 2>/dev/null)" ] && rmdir "$DIR/.kilit" && mkdir "$DIR/.kilit"; } || exit 0
@@ -49,14 +49,16 @@ SAYI="$(js birlestir "$VERI/tum-veri-$BUGUN.json" "$TMP/teklifler.json" "$TMP"/p
 ADET="$(js csv "$TMP/teklifler.json" "$VERI/teklif-listesi-$BUGUN.csv")"
 MUSTERI="$(js musteri "$VERI/tum-veri-$BUGUN.json")"
 
-# 3) Dosyalar: teklif PDF'leri ve müşteri dosyaları — yalnız yeni/değişenler
-indir() {  # kova uzak-yol hedef epoch touch-zamanı
-  if [ ! -f "$3" ] || [ "$(stat -f %m "$3")" -lt $(($4 - 2)) ]; then
+# 3) Müşteri klasörleri: Yedekler/Müşteriler/<Müşteri adı>/ Teklifler · Resimler · Belgeler · Keşif + Müşteri bilgileri.txt
+#    (yalnız yeni/değişen dosyalar iner; çöp kutusundakiler alınmaz)
+EKSIK=0
+indir() {  # kova uzak-yol hedef epoch touch-zamanı (epoch 0: yerelde varsa indirme)
+  if [ ! -f "$3" ] || { [ "$4" -gt 0 ] && [ "$(stat -f %m "$3")" -lt $(($4 - 2)) ]; }; then
     ENC="$(js urlyol "$2")"
-    if curl -sS -f "$URL/storage/v1/object/$1/$ENC" -H "apikey: $KEY" -H "$AUTH" -o "$TMP/indir.tmp"; then
-      mkdir -p "$(dirname "$3")"; mv "$TMP/indir.tmp" "$3"; touch -t "$5" "$3"; return 0
+    if curl -sS -f "$URL/storage/v1/object/$1/$ENC" -H "apikey: $KEY" -H "$AUTH" -o "$TMP/indir.tmp" 2>/dev/null; then
+      mkdir -p "$(dirname "$3")"; mv "$TMP/indir.tmp" "$3"; [ -n "$5" ] && touch -t "$5" "$3"; return 0
     fi
-    PDFHATA=" (bazı dosyalar indirilemedi)"
+    rm -f "$TMP/indir.tmp"; EKSIK=$((EKSIK + 1))
   fi
   return 1
 }
@@ -78,22 +80,20 @@ listele() {  # kova onek -> "yol|epoch|touch" satırları (alt klasörler dahil)
   done
 }
 YENI=0; YENIDOSYA=0; PDFHATA=""
-listele teklifler "" > "$TMP/pdfler.txt"
-while IFS='|' read -r YOL EP TS; do
-  case "$YOL" in *.pdf) ;; *) continue ;; esac
-  YEREL="$(js pdfad "$YOL" "$TMP/teklifler.json" < /dev/null)"
-  indir teklifler "$YOL" "$PDF/$YEREL" "$EP" "$TS" < /dev/null && YENI=$((YENI + 1))
-done < "$TMP/pdfler.txt"
-listele musteri-dosyalari "" > "$TMP/dosyalar.txt"
-while IFS='|' read -r YOL EP TS; do
-  [ -n "$YOL" ] || continue
-  indir musteri-dosyalari "$YOL" "$HEDEF/MusteriDosyalari/$YOL" "$EP" "$TS" < /dev/null && YENIDOSYA=$((YENIDOSYA + 1))
-done < "$TMP/dosyalar.txt"
+mkdir -p "$HEDEF/Müşteriler"
+js plan "$VERI/tum-veri-$BUGUN.json" "$HEDEF/Müşteriler" > "$TMP/plan.txt" || hata "Müşteri klasörleri hazırlanamadı."
+while IFS='|' read -r KOVA UZAK YEREL EP TS; do
+  [ -n "$UZAK" ] || continue
+  if indir "$KOVA" "$UZAK" "$YEREL" "$EP" "$TS" < /dev/null; then
+    if [ "$KOVA" = teklifler ]; then YENI=$((YENI + 1)); else YENIDOSYA=$((YENIDOSYA + 1)); fi
+  fi
+done < "$TMP/plan.txt"
+[ "$EKSIK" -eq 0 ] || PDFHATA="$PDFHATA ($EKSIK dosya sunucuda bulunamadı)"
 listele uploads "" > "$TMP/resimler.txt"
 while IFS='|' read -r YOL EP TS; do
   [ -n "$YOL" ] || continue
   indir uploads "$YOL" "$HEDEF/UrunResimleri/$YOL" "$EP" "$TS" < /dev/null && YENIDOSYA=$((YENIDOSYA + 1))
 done < "$TMP/resimler.txt"
 
-yaz "Tamam: $SAYI kayıt ($ADET teklif, $MUSTERI müşteri), $YENI yeni/değişen PDF, $YENIDOSYA yeni müşteri dosyası$PDFHATA"
+yaz "Tamam: $SAYI kayıt ($ADET teklif, $MUSTERI müşteri), $YENI yeni/değişen teklif PDF'i, $YENIDOSYA yeni dosya$PDFHATA"
 bildir backup "$ADET" "$MUSTERI" "$YENI" "$PDFHATA" "$YENIDOSYA" "$SAYI"
