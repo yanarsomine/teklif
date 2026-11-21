@@ -20,7 +20,8 @@ Ana dalda (`main`) yapılan her değişiklik GitHub Pages ile birkaç dakikada c
 - Teklif kaydı: yeni teklif `create` ile (numara `next_quote_no` RPC; yoksa eski sayaç yöntemi), kayıtlı teklif `setIf(_ts)` ile; çakışmada yalnız müşteri bağlantısı değiştiyse sessiz birleştirme, değilse "revizyon olarak kaydet / güncel hâli aç" penceresi. Teklif `vatRate` (KDV oranı) taşır; satırlar kuruşa yuvarlanır. `olusturan/olusturanId/olusturma`, `guncelleyen`. Kaydedilmemiş değişiklik varken başka teklife geçişte onay sorulur (`confirmLeave`). PDF/Gönder önce kaydeder; kayıt olmazsa PDF üretmez.
 - Silme: teklif, müşteri, iş ve dosya `silindi:true` ile çöp kutusuna gider (Teklifler › Çöp kutusu; geri alma herkes, kalıcı silme admin — teklif PDF'i de arşivden silinir). Müşteri işleri `saveJobs` ile iş bazında birleştirilerek yazılır.
 - Revizyon: `revBase` (asıl no), `rev` (1,2…), `revOf`; numara `<asıl no>-R<n>`, kaydedilince verilir. Aylık özet revizyonları asıl teklifte toplar.
-- WhatsApp gönder: PDF hazırlanır, telefonda Web Share (dosya), değilse wa.me + PDF indirme.
+- WhatsApp gönder: PDF hazırlanır, telefonda wa.me / Web Share (dosya); bilgisayarda (Mac/Windows) `whatsapp://send` ile masaüstü uygulaması, açılmazsa `web.whatsapp.com/send` (mesaj panoya da kopyalanır).
+- Teklif koşullarında `terms.extra` ("Ek not", serbest metin) — Teklif notu ile Not arasında; boşsa PDF'te görünmez.
 - `custom/<kod>` programdan eklenen ürünler · `counter/quotes` sıradaki numara · `counter/rate` {eur, usd, date}
 - Roller `profiles.role`: `admin` (fiyat, ayar, ürün düzenler, kalıcı siler) / `staff` (teklif hazırlar) / `pending` (onay bekliyor, hiçbir veriye erişemez — yönetici Supabase › profiles tablosunda `staff` yapar).
 

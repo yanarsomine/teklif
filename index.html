@@ -949,6 +949,7 @@ table.list th,.list th{font-size:11px;letter-spacing:.06em;text-transform:upperc
           <div class="f"><label for="t-ins">Montaj</label><input id="t-ins"></div>
           <div class="f"><label for="t-war">Garanti</label><input id="t-war"></div>
           <div class="f w2"><label>Teklif notu <span class="note">(teklife eklemek istediklerinizi işaretleyin)</span></label><div id="t-xn" class="xn"></div></div>
+          <div class="f w2"><label for="t-extra">Ek not <span class="note">(bu teklife özel, istediğinizi yazın — boş bırakılırsa teklifte görünmez)</span></label><textarea id="t-extra" rows="3"></textarea></div>
           <div class="f w2"><label for="t-notes">Not</label><textarea id="t-notes"></textarea></div>
         </div>
       </div>
@@ -1305,7 +1306,7 @@ function fixNote(){if(!Q?.terms)return;if(OLDNOTE.test(Q.terms.notes||''))Q.term
   if(Q.terms.xn)Q.terms.xn=[...new Set(Q.terms.xn.map(x=>XNFIX[x]||x))]}
 function bindQuoteFields(){fixNote();renderXn();fillBy();if(!$('#pn-pkg').hidden)renderPkg();else{const k=Q.pkg;$('#pkgbadge').textContent=k&&k.on?`· ${Number(k.net)?fmt(Number(k.net),k.cur):'fiyat yok'}`:''}
   const map={'c-name':['customer','name'],'c-contact':['customer','contact'],'c-phone':['customer','phone'],'c-email':['customer','email'],'c-project':['customer','project'],
-   't-pay':['terms','pay'],'t-del':['terms','del'],'t-ins':['terms','ins'],'t-war':['terms','war'],'t-notes':['terms','notes']};
+   't-pay':['terms','pay'],'t-del':['terms','del'],'t-ins':['terms','ins'],'t-war':['terms','war'],'t-notes':['terms','notes'],'t-extra':['terms','extra']};
   Object.entries(map).forEach(([id,[a,b]])=>{const el=$('#'+id);el.value=Q[a][b]||'';el.oninput=()=>{Q[a][b]=el.value;saveDraft();suggest(id)}});
   $('#q-date').value=Q.date;$('#q-date').oninput=e=>{Q.date=e.target.value;saveDraft()};
   $('#q-rate').value=Q.rate||'';$('#q-usd').value=Q.usd||'';
@@ -1453,6 +1454,7 @@ function termsHTML(){fixNote();const T=Q.terms;const sv=Q.pkg?.on?(Q.pkg.svc||[]
   return `<div class="d-terms">${NOVAT()?`<div class="w" style="font-weight:700;color:#9a1b1f">Fiyatlarımıza KDV dahil değildir.</div>`:''}${r.map(x=>`<div><b>${x[0]}</b>${esc(x[1])}</div>`).join('')}
    ${S.bank?`<div class="w"><b>Banka bilgileri</b>${esc(S.bank)}</div>`:''}
    ${(T.xn||[]).length?`<div class="w"><b>Teklif notu</b>${T.xn.map(x=>'• '+esc(x)).join('<br>')}</div>`:''}
+   ${(T.extra||'').trim()?`<div class="w"><b>Ek not</b>${esc(T.extra.trim()).replace(/\n/g,'<br>')}</div>`:''}
    ${T.notes?`<div class="w"><b>Not</b>${esc(T.notes).replace(/\n/g,'<br>')}</div>`:''}</div>
    <div class="d-sign"><div>Teklifi veren<br><b>${esc(Q.by||S.by)}</b>${(Q.by?Q.byph:S.byph)?' · '+esc(Q.by?Q.byph:S.byph):''}</div><div>Müşteri onayı<br><span style="color:#8a7f7c">Ad Soyad / İmza / Tarih</span></div></div>`}
 function custHTML(){const c=Q.customer;return `<div class="d-meta">
@@ -1664,19 +1666,23 @@ function canShareFile(file){try{return !!navigator.canShare&&navigator.canShare(
 function openBlob(blob){const u=URL.createObjectURL(blob);const w=window.open(u,'_blank');if(!w)location.href=u;setTimeout(()=>URL.revokeObjectURL(u),120000)}
 function showSend(blob,nm,no,link){
   const file=new File([blob],nm,{type:'application/pdf'});const canFile=canShareFile(file);
-  const num=waNum(Q.customer.phone);
+  const num=waNum(Q.customer.phone);const desk=!isPhone();
   const m=pdfModal('Teklif '+no+' gönderilmeye hazır',`
    <label class="f" style="display:grid;gap:4px"><span class="note">Mesaj</span><textarea id="sn-msg" rows="5">${esc(waText(no,link))}</textarea></label>
    <div class="sndb">
-    ${link?`<button class="btn wa big" type="button" id="sn-wa"><b>WhatsApp'ta gönder</b><small>${num?esc(Q.customer.name||'Müşteri')+' sohbeti açılır; ':''}mesajda teklifin bağlantısı var, müşteri PDF'i oradan açar</small></button>`:''}
+    ${desk?`<button class="btn wa big" type="button" id="sn-app"><b>WhatsApp uygulamasında aç</b><small>${num?esc(Q.customer.name||'Müşteri')+' sohbeti, mesaj yazılı olarak açılır':'Mesaj yazılı olarak açılır, kişiyi siz seçersiniz'}${link?'':'; PDF indirilir, sohbete sürükleyin'}</small></button>
+    <button class="btn" type="button" id="sn-web">WhatsApp Web'de aç (tarayıcıda)</button>`
+    :`${link?`<button class="btn wa big" type="button" id="sn-wa"><b>WhatsApp'ta gönder</b><small>${num?esc(Q.customer.name||'Müşteri')+' sohbeti açılır; ':''}mesajda teklifin bağlantısı var, müşteri PDF'i oradan açar</small></button>`:''}
     ${canFile?`<button class="btn ${link?'':'wa big'}" type="button" id="sn-share">${link?'PDF dosyasını paylaş (WhatsApp, Mail…)':`<b>PDF'i paylaş</b><small>Açılan listeden WhatsApp'ı, sonra müşteriyi seçin</small>`}</button>`:''}
-    ${!link&&!canFile?`<button class="btn wa big" type="button" id="sn-wa"><b>WhatsApp'ı aç</b><small>PDF indirilir; sohbete ataç simgesiyle ekleyin</small></button>`:''}
+    ${!link&&!canFile?`<button class="btn wa big" type="button" id="sn-wa"><b>WhatsApp'ı aç</b><small>PDF indirilir; sohbete ataç simgesiyle ekleyin</small></button>`:''}`}
     <button class="btn ghost" type="button" id="sn-dl">PDF'i ${isPhone()?'aç / kaydet':'indir'}</button>
    </div>
-   <p class="note" style="margin:0">${link?'Bağlantı 60 gün geçerlidir. ':''}${num?'Telefon: '+esc(Q.customer.phone):'Teklifte telefon yok; WhatsApp\'ta kişiyi kendiniz seçeceksiniz.'}</p>`);
+   <p class="note" id="sn-info" style="margin:0">${link?'Bağlantı 60 gün geçerlidir. ':''}${num?'Telefon: '+esc(Q.customer.phone):'Teklifte telefon yok; WhatsApp\'ta kişiyi kendiniz seçeceksiniz.'}${desk?'<br>Mesaj panoya da kopyalanır; gerekirse sohbete yapıştırın (⌘V / Ctrl+V).':''}</p>`);
   const msg=()=>m.querySelector('#sn-msg').value;
+  const copyMsg=()=>{try{navigator.clipboard?.writeText(msg()).catch(()=>{})}catch(e){}};
+  const q=()=>(num?'phone='+num+'&':'')+'text='+encodeURIComponent(msg());
   const sh=m.querySelector('#sn-share');
-  if(sh)sh.onclick=()=>{try{navigator.clipboard?.writeText(msg()).catch(()=>{})}catch(e){}
+  if(sh)sh.onclick=()=>{copyMsg();
     navigator.share({files:[file],text:msg(),title:'Yanar Şömine Teklif '+no}).then(()=>{m.remove();toast('Teklif paylaşıldı')})
       .catch(e=>{if(e?.name!=='AbortError')toast('Paylaşılamadı: '+(e?.message||e),4000)})};
   const wb=m.querySelector('#sn-wa');
@@ -1684,6 +1690,16 @@ function showSend(blob,nm,no,link){
     const url='https://wa.me/'+(num||'')+'?text='+encodeURIComponent(msg());
     if(!link)savePdfFile(blob,nm);
     const w=window.open(url,'_blank');if(w){try{w.opener=null}catch(e){}}else location.href=url;};
+  /* Bilgisayar (Mac/Windows): wa.me sayfası masaüstü uygulamasını çoğu zaman bulamıyor; doğrudan whatsapp:// ile aç, olmazsa WhatsApp Web */
+  const ab=m.querySelector('#sn-app');
+  if(ab)ab.onclick=()=>{copyMsg();if(!link)savePdfFile(blob,nm);
+    let left=false;const onBlur=()=>{left=true};window.addEventListener('blur',onBlur,{once:true});
+    const fr=document.createElement('iframe');fr.style.display='none';fr.src='whatsapp://send?'+q();document.body.appendChild(fr);
+    setTimeout(()=>{fr.remove();window.removeEventListener('blur',onBlur);
+      if(!left&&document.hasFocus()){const i=m.querySelector('#sn-info');if(i)i.innerHTML='<b style="color:#9a1b1f">WhatsApp uygulaması açılmadı.</b> Bilgisayarda WhatsApp kurulu değilse ya da tarayıcı izin vermediyse “WhatsApp Web\'de aç”a basın.';m.querySelector('#sn-web')?.focus()}},2500)};
+  const web=m.querySelector('#sn-web');
+  if(web)web.onclick=()=>{copyMsg();if(!link)savePdfFile(blob,nm);
+    const url='https://web.whatsapp.com/send?'+q();const w=window.open(url,'_blank');if(w){try{w.opener=null}catch(e){}}else location.href=url};
   m.querySelector('#sn-dl').onclick=()=>savePdfFile(blob,nm);
 }
 /* PDF'i kaydet: telefonda paylaşım menüsü ("Dosyalara Kaydet") ya da PDF görüntüleyici; bilgisayarda İndirilenler */
