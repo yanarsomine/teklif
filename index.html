@@ -1111,7 +1111,7 @@ const VATR=()=>{const v=Q&&Q.vatRate!=null?Number(Q.vatRate):Number(S.vat);retur
 const r2=x=>Math.round(((Number(x)||0)+Number.EPSILON)*100)/100;
 const toNet=(price,cur)=>isIncl(cur)?price/(1+VATR()/100):price;
 
-const CATORDER=['Mermer Şömineler (Üretimimiz)','Barbekü','Doğalgazlı Şömineler','Elektrikli Şömineler','Odunlu Şömine Hazneleri','Yerli Asansörlü Hazneler','Orta Şömineler','Sobalar','Aksesuar ve Yedek Parça','Baca ve Isı Odası Uygulamaları','Baca ve Montaj Ekipmanları','Özel Ürünler'];
+const CATORDER=['Mermer Şömineler (Üretimimiz)','Barbekü','Doğalgazlı Şömineler','Elektrikli Şömineler','Odunlu Şömine Hazneleri','Orta Şömineler','Sobalar','Aksesuar ve Yedek Parça','Baca ve Isı Odası Uygulamaları','Baca ve Montaj Ekipmanları','Özel Ürünler'];
 function renderCats(){
   const cats=['Tümü',...CATORDER.filter(c=>P.some(p=>p.cat===c&&!p.hidden))];
   $('#cats').innerHTML=cats.map(c=>`<button class="chip" aria-pressed="${c===cat}" data-c="${esc(c)}">${esc(c)}</button>`).join('');
@@ -1132,7 +1132,7 @@ function renderGrid(){
   $('#grid').innerHTML=list.length?list.map(p=>`
    <div class="card">
     <div class="ph">${thumbOf(p)?`<img loading="lazy" src="${esc(thumbOf(p))}" alt="">`:''}</div>
-    <div class="bd"><div class="nm">${esc(p.name)}</div><div class="sb">${esc(p.sub)}${p.drw?' · <span class="badge">çizim var</span>':''}</div>
+    <div class="bd"><div class="nm">${esc(p.name)}</div><div class="sb">${esc(p.sub)}${p.shape?' · '+esc(p.shape):''}${p.drw?' · <span class="badge">çizim var</span>':''}</div>
      ${p.variants?.length?`<select aria-label="Seçenek" data-var="${esc(p.code)}" style="border:1px solid var(--line);border-radius:6px;padding:3px 5px;font-size:12px;background:var(--bg)">${p.variants.map((v,i)=>`<option value="${i}">${esc(v.v)}${v.price?' – '+fmt(v.price,p.cur):''}</option>`).join('')}</select>`:''}
      <div class="row">${priceLabel(p)}<button class="btn sm ${inQ.has(p.code)?'added':''}" data-add="${esc(p.code)}">${inQ.has(p.code)?'Eklendi ✓':'Ekle'}</button></div>
     </div></div>`).join(''):'<div class="empty">Aramanızla eşleşen ürün yok.</div>';
@@ -1152,6 +1152,8 @@ function addItem(code,vi){
   saveDraft();renderItems();renderGrid();toast(p.name+' eklendi');
 }
 const MONCAT='Baca ve Montaj Ekipmanları';
+/* Montaj malzemesi: eski 'Baca ve Montaj Ekipmanları' kategorisi ya da mon:true (artık 'Baca ve Isı Odası Uygulamaları' altında) */
+const isMon=p=>!!p&&(p.cat===MONCAT||p.mon===true);
 const PKGIMGS=[{src:'img/montaj/duz-camli.jpg',label:'Düz camlı hazne – A1 yanmaz levha ısı odası'},{src:'img/montaj/kose-camli.jpg',label:'Köşe camlı hazne – A1 yanmaz levha ısı odası'},{src:'img/montaj/kose-camli-bitmis.jpg',label:'Köşe camlı hazne – bitmiş ısı odası, alt ve üst menfezli'}];
 const VR=()=>1+VATR()/100, incl=i=>(i?.vat||'excl')==='incl', NOVAT=()=>Q.opts.addVat===false&&!ALL().some(incl);
 const showP=(n,i)=>incl(i)?n*VR():n, fromP=(v,i)=>incl(i)?v/VR():v, modeLbl=i=>incl(i)?'KDV dahil':'KDV hariç';
@@ -1210,7 +1212,7 @@ function renderItems(){
 }
 function renderPkg(){
   const k=Q.pkg||(Q.pkg={on:false,svc:['Nakliye','Montaj','İşçilik'],title:'',net:'',cur:'TRY',desc:'',mats:{}});
-  const mats=P.filter(p=>p.cat===MONCAT&&!p.hidden);
+  const mats=P.filter(p=>isMon(p)&&!p.hidden);
   const n=Object.keys(k.mats||{}).length;
   $('#pkgbadge').textContent=k.on?`· ${Number(k.net)?fmt(Number(k.net),k.cur):'fiyat yok'}`:'';
   $('#pn-pkg').innerHTML=`
@@ -1344,9 +1346,10 @@ function showSub(w){['items','pkg','baca'].forEach(x=>{$('#st-'+x).setAttribute(
 $('#st-items').onclick=()=>showSub('items');$('#st-pkg').onclick=()=>showSub('pkg');$('#st-baca').onclick=()=>showSub('baca');
 const BACACAT='Baca ve Isı Odası Uygulamaları';
 const STDNOTES=['Alçı, sıva ve boya firmamıza ait değildir.','Çatı baca etrafı su izolasyonu firmamıza ait değildir.','Şömine kurulacak alanda parke olmaması gerekir.','Şömineden sonra döşenecek parke ile şömine arasında 1 cm açıklık bırakılmalıdır; aksi halde şöminede yaşanacak olumsuzluklardan firmamız sorumlu değildir.','Çıkan atık çuvallanıp bırakılacaktır.','Keşif sonrası fiyat değişiklik gösterebilir.'];
-function bacaBadge(){const n=Q.items.filter(i=>PIDX[i.code]?.cat===BACACAT).length;$('#bacabadge').textContent=n?'· '+n:''}
+const isBacaSvc=p=>!!p&&p.cat===BACACAT&&!isMon(p);
+function bacaBadge(){const n=Q.items.filter(i=>isBacaSvc(PIDX[i.code])).length;$('#bacabadge').textContent=n?'· '+n:''}
 function renderBaca(){
-  const list=P.filter(p=>p.cat===BACACAT&&!p.hidden);
+  const list=P.filter(p=>isBacaSvc(p)&&!p.hidden);
   $('#pn-baca').innerHTML=`<p class="note" style="margin:0 0 10px">Şömine teklifine eklenecek baca ve ısı odası işlerini seçin. Seçtikleriniz teklif kalemlerine eklenir, PDF'te fotoğraf ve kullanılan malzemelerle ayrı sayfada görünür. Fiyatlar KDV hariç gelir, istediğiniz gibi değiştirebilirsiniz.</p>
    <div style="display:grid;gap:8px">${list.map(p=>{const i=Q.items.find(x=>x.code===p.code);return `<div class="pm ${i?'on':''}" data-bc="${esc(p.code)}" style="align-items:start">
      <input type="checkbox" data-b="sel" ${i?'checked':''} aria-label="${esc(p.name)}" style="margin-top:4px">
@@ -1479,7 +1482,7 @@ function detailPageHTML(i,no){const p=PIDX[i.code];const img=itemImg(i);
   return `${miniHead(no,'Ürün bilgisi')}
   <div class="p-top" style="${img?'':'grid-template-columns:1fr'}">${img?'':'<div hidden>'}<div style="display:flex;flex-direction:column;gap:8px"><div class="p-img" style="${showDrw?'':(p.gallery&&!i.cimg?'height:280px':'height:360px')}">${img?`<img src="${esc(img)}" alt="">`:''}</div>
    ${p.gallery&&!i.cimg&&!showDrw?`<div style="display:grid;grid-template-columns:repeat(${p.gallery.length},1fr);gap:8px">${p.gallery.map(g=>`<div class="p-img" style="height:120px;padding:4px"><img src="${esc(g)}" alt=""></div>`).join('')}</div>`:''}</div>${img?'':'</div>'}
-   <div><div class="p-sub">${esc(p.sub)}</div><div class="p-name">${esc(i.name||p.name)}</div>${i.variant?`<div style="font-weight:600">${esc(i.varLabel||'Seçenek')}: ${esc(i.variant)}</div>`:''}
+   <div><div class="p-sub">${esc(p.shape||p.sub)}</div><div class="p-name">${esc(i.name||p.name)}</div>${i.variant?`<div style="font-weight:600">${esc(i.varLabel||'Seçenek')}: ${esc(i.variant)}</div>`:''}
     ${i.note?`<div style="margin-top:6px;padding:6px 8px;background:#f7f2f0;border-left:3px solid #9a1b1f;font-size:11px"><b>Açıklama:</b> ${esc(i.note).replace(/\n/g,'<br>')}</div>`:''}
     ${p.short?`<div class="p-desc">${esc(p.short)}</div>`:''}
     ${p.feats.length?`<ul class="p-feat">${p.feats.slice(0,showDrw?5:8).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`:''}
@@ -1510,7 +1513,7 @@ async function buildPages(){
   if(Q.opts.details){const seen=new Set();const mon=[];
     for(const i of Q.items){if(!i.code&&(i.cimg||(i.note||'').length>60)&&i.detail!==false){newPage(freeDetailHTML(i,no));continue}
       if(!i.code||i.detail===false||!PIDX[i.code])continue;const key=i.code+'|'+i.variant;if(seen.has(key))continue;seen.add(key);
-      if(PIDX[i.code].cat===MONTAJ){mon.push(i);continue}
+      if(isMon(PIDX[i.code])){mon.push(i);continue}
       const d=newPage(detailPageHTML(i,no));
       if(!fits(d)){d.querySelectorAll('.p-specs .r').forEach((r,k,a)=>{if(k>=a.length-6)r.remove()})}
     }
