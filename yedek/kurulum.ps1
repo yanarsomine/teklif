@@ -3,12 +3,33 @@
 $ErrorActionPreference = 'Stop'
 $Dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+trap { Write-Host ''; Write-Host ('HATA: ' + $_.Exception.Message) -ForegroundColor Red; Read-Host 'Kapatmak için Enter'; exit 1 }
+$URL = 'https://kxwhxjwurzyhtdvcumap.supabase.co'
+$KEY = (Select-String -Path (Join-Path $Dir 'yedek.ps1') -Pattern "^\`$KEY\s*=\s*'([^']+)'").Matches[0].Groups[1].Value
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 Write-Host ''
 Write-Host 'Yanar Şömine teklif yedeği kuruluyor...' -ForegroundColor Cyan
-Write-Host 'Açılan pencereye teklif programına giriş yaptığınız e-posta ve şifreyi yazın.'
-Write-Host 'Şifre bu bilgisayarda, yalnızca bu Windows kullanıcısının açabileceği şekilde şifreli saklanır.'
-$cred = Get-Credential -Message 'Teklif programı giriş bilgileri (e-posta ve şifre)'
-if (-not $cred) { Write-Host 'İptal edildi.'; exit 1 }
+Write-Host 'Teklif programına giriş yaptığınız e-posta ve şifreyi BU PENCEREYE yazın.'
+Write-Host 'Şifre yazarken ekranda görünmez; bu bilgisayarda yalnız bu Windows kullanıcısının açabileceği şekilde şifreli saklanır.'
+Write-Host ''
+while ($true) {
+  $email = (Read-Host 'E-posta').Trim()
+  $sifre = Read-Host 'Şifre' -AsSecureString
+  if (-not $email -or $sifre.Length -eq 0) { Write-Host 'E-posta ve şifre gerekli.' -ForegroundColor Yellow; continue }
+  $cred = New-Object System.Management.Automation.PSCredential($email, $sifre)
+  # Bilgiler doğru mu? Kaydetmeden önce programa giriş denenir
+  try {
+    $body = @{ email = $email; password = $cred.GetNetworkCredential().Password } | ConvertTo-Json
+    Invoke-RestMethod -Method Post -Uri "$URL/auth/v1/token?grant_type=password" -Headers @{ apikey = $KEY } `
+      -ContentType 'application/json' -Body ([Text.Encoding]::UTF8.GetBytes($body)) | Out-Null
+    Remove-Variable body
+    Write-Host 'Giriş doğrulandı.' -ForegroundColor Green
+    break
+  } catch {
+    Write-Host 'Giriş yapılamadı: e-posta veya şifre hatalı (ya da internet yok). Tekrar deneyin.' -ForegroundColor Yellow
+  }
+}
 $cred | Export-Clixml -Path (Join-Path $Dir 'giris.xml')
 
 $saat = '18:00'
