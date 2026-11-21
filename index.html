@@ -926,7 +926,7 @@ table.list th,.list th{font-size:11px;letter-spacing:.06em;text-transform:upperc
         </div>
         <div class="stabs" role="tablist">
           <button class="stab" role="tab" id="st-items" aria-selected="true">Teklif kalemleri</button>
-          <button class="stab" role="tab" id="st-pkg" aria-selected="false">Nakliye · Montaj · İşçilik <span id="pkgbadge"></span></button>
+          <button class="stab" role="tab" id="st-pkg" aria-selected="false">Isı odası (paket) <span id="pkgbadge"></span></button>
           <button class="stab" role="tab" id="st-baca" aria-selected="false">Baca · Isı Odası <span id="bacabadge"></span></button>
         </div>
         <div id="pn-items">
@@ -1165,7 +1165,9 @@ function pkgItem(){const k=Q.pkg;if(!k||!k.on)return null;
   const mats=Object.entries(k.mats||{}).filter(([c])=>PIDX[c]).map(([c,m])=>PIDX[c].name+(m.variant?' '+m.variant:'')+(Number(m.qty)?' ('+String(Number(m.qty)).replace('.',',')+' '+(PIDX[c].unit||'adet')+')':''));
   const desc=[k.desc,mats.length?'Dahil malzemeler: '+mats.join(', '):''].filter(Boolean).join(' · ');
   return {k:'pkg',pkg:true,code:null,name:k.title||svcTitle(),desc,qty:1,unit:'paket',net:Number(k.net)||0,vat:k.vat||'excl',cur:k.cur||'TRY',disc:0}}
-function svcTitle(){const sv=(Q.pkg?.svc||[]);if(!sv.length)return 'Paket hizmet';return (sv.length>1?sv.slice(0,-1).join(', ')+' ve '+sv[sv.length-1]:sv[0])+' (paket fiyat)'}
+const PKGTITLE='Isı odası malzemeleri ve yapımı (paket fiyat)';
+const PKGDESC='40 mm × 40 mm × 2 mm profil altyapı oluşturma, cam elyaf karışımlı A1 sınıfı yanmaz alçı levha kaplama';
+function svcTitle(){if(!Q.pkg?.svc)return PKGTITLE;const sv=(Q.pkg?.svc||[]);if(!sv.length)return 'Paket hizmet';return (sv.length>1?sv.slice(0,-1).join(', ')+' ve '+sv[sv.length-1]:sv[0])+' (paket fiyat)'}
 function ALL(){const p=pkgItem();const it=Q.items.filter(i=>i.code||(i.name||'').trim()||Number(i.net));return p?it.concat([p]):it}
 function lineNet(i){return (Number(i.net)||0)*(Number(i.qty)||0)*(1-(Number(i.disc)||0)/100)}
 function totals(){
@@ -1211,19 +1213,20 @@ function renderItems(){
   renderTotals();
 }
 function renderPkg(){
-  const k=Q.pkg||(Q.pkg={on:false,svc:['Nakliye','Montaj','İşçilik'],title:'',net:'',cur:'TRY',desc:'',mats:{}});
+  const k=Q.pkg||(Q.pkg={on:false,title:PKGTITLE,net:'',cur:'TRY',desc:PKGDESC,mats:{}});
+  if(!k.on&&!k.title&&!k.desc){k.title=PKGTITLE;k.desc=PKGDESC;delete k.svc}
   const mats=P.filter(p=>isMon(p)&&!p.hidden);
   const n=Object.keys(k.mats||{}).length;
   $('#pkgbadge').textContent=k.on?`· ${Number(k.net)?fmt(Number(k.net),k.cur):'fiyat yok'}`:'';
   $('#pn-pkg').innerHTML=`
    <label class="chk" style="font-weight:600"><input type="checkbox" data-pk="on" ${k.on?'checked':''}> Teklife paket olarak ekle</label>
-   <div style="display:flex;gap:12px;flex-wrap:wrap;margin:8px 0">${['Nakliye','Montaj','İşçilik'].map(x=>`<label class="chk"><input type="checkbox" data-svc="${x}" ${(k.svc||[]).includes(x)?'checked':''}> ${x}</label>`).join('')}</div>
+   ${k.svc?`<div style="display:flex;gap:12px;flex-wrap:wrap;margin:8px 0">${['Nakliye','Montaj','İşçilik'].map(x=>`<label class="chk"><input type="checkbox" data-svc="${x}" ${(k.svc||[]).includes(x)?'checked':''}> ${x}</label>`).join('')}</div>`:''}
    <div class="fields">
     <div class="f w2"><label for="pk-title">Teklifte görünecek ad</label><input id="pk-title" data-pk="title" value="${esc(k.title)}" placeholder="${esc(svcTitle())}"></div>
     <div class="f"><label for="pk-net">Paket fiyatı</label><input id="pk-net" data-pkp="1" type="number" min="0" step="0.01" value="${Number(k.net)?+showP(Number(k.net),k).toFixed(2):''}"></div>
     <div class="f"><label for="pk-vat">KDV</label><select id="pk-vat" data-pkv="1"><option value="excl" ${!incl(k)?'selected':''}>KDV hariç</option><option value="incl" ${incl(k)?'selected':''}>KDV dahil</option></select></div>
     <div class="f"><label for="pk-cur">Para birimi</label><select id="pk-cur" data-pk="cur">${['TRY','EUR','USD'].map(c=>`<option value="${c}" ${(k.cur||'TRY')===c?'selected':''}>${CURN[c]}</option>`).join('')}</select></div>
-    <div class="f w2"><label for="pk-desc">Açıklama (isteğe bağlı)</label><input id="pk-desc" data-pk="desc" value="${esc(k.desc)}" placeholder="Ör. 6 metreye kadar baca hattı, ısı odası yalıtımı dahil"></div>
+    <div class="f w2"><label for="pk-desc">Açıklama (isteğe bağlı)</label><input id="pk-desc" data-pk="desc" value="${esc(k.desc)}" placeholder="${esc(PKGDESC)}"></div>
    </div>
    <h3 style="margin:14px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Teklife eklenecek uygulama resimleri (${(k.imgs||[]).length} seçili)</h3>
    <div class="pimgs">${[...PKGIMGS,...(k.cimgs||[]).map((u,n)=>({src:u,label:'Kendi resminiz '+(n+1),own:true}))].map(g=>{const on=(k.imgs||[]).includes(g.src);return `<label class="pimg ${on?'on':''}"><input type="checkbox" data-pimg="${esc(g.src)}" ${on?'checked':''}><img src="${esc(g.src)}" alt=""><span>${esc(g.label)}</span>${g.own?`<button type="button" class="imgbtn" data-rmpimg="${esc(g.src)}">Kaldır</button>`:''}</label>`}).join('')}
