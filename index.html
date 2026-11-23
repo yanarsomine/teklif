@@ -1211,7 +1211,7 @@ function renderItems(){
       ${!p?`<div class="f"><label>Birim</label><select data-f="unit">${['adet','m','m²','paket','rulo','takım','set','gün','sefer','iş'].map(u=>`<option ${u===(i.unit||'adet')?'selected':''}>${u}</option>`).join('')}</select></div>`:''}
       <div class="f"><label>Birim fiyat</label><input class="w-p" type="number" min="0" step="0.01" data-f="price" value="${+showP(Number(i.net)||0,i).toFixed(2)||''}"></div>
       <div class="f"><label>KDV</label><select data-f="vat"><option value="excl" ${!incl(i)?'selected':''}>KDV hariç</option><option value="incl" ${incl(i)?'selected':''}>KDV dahil</option></select></div>
-      <div class="f"><label>Para</label><select data-f="cur" ${p?'disabled':''}>${CURORDER.map(c=>`<option value="${c}" ${i.cur===c?'selected':''}>${CURS[c]}</option>`).join('')}</select></div>
+      <div class="f"><label>Para</label><select data-f="cur">${CURORDER.map(c=>`<option value="${c}" ${i.cur===c?'selected':''}>${CURS[c]}</option>`).join('')}</select></div>
       <div class="f"><label>İsk. %</label><input class="w-d" type="number" min="0" max="100" step="0.5" data-f="disc" value="${i.disc}"></div>
       <div class="lt">${ltHTML(i)}</div>
     </div>
@@ -1399,12 +1399,25 @@ $('#pn-pkg').addEventListener('input',e=>{const t=e.target,k=Q.pkg;
   if(t.dataset.m==='sel'){if(t.checked){const p=PIDX[c];k.mats[c]={variant:p.variants?.[0]?.v||'',qty:''};k.on=true}else delete k.mats[c];saveDraft();renderPkg();renderTotals();return}
   if(t.dataset.m)k.mats[c][t.dataset.m]=t.value;saveDraft();
 });
+/* Kalemin para birimi teklifte değiştirilebilir (katalog ürünü dahil); fiyat teklifin kuruyla çevrilebilir */
+const fxRate=c=>c==='TRY'?1:c==='EUR'?Number(Q.rate):Number(Q.usd);
+const fxOk=(a,b)=>[a,b].every(c=>fxRate(c)>0);
+const fxConv=(n,from,to)=>from===to||!fxOk(from,to)?n:r2((Number(n)||0)*fxRate(from)/fxRate(to));
+async function itemCur(i,sel){const from=i.cur||'TRY',to=sel.value;if(from===to)return;
+  let v='keep';
+  if(Number(i.net)>0&&fxOk(from,to)){const a=showP(Number(i.net),i),b=r2(a*fxRate(from)/fxRate(to));
+    v=await askDlg((i.name||'Kalem')+': '+CURN[from]+' → '+CURN[to],`Birim fiyat teklifin kuruyla (€ ${rTxt(Q.rate)} · $ ${rTxt(Q.usd)}) çevrilsin mi, yoksa rakam aynı mı kalsın? Çevrilirse: ${fmt(a,from)} → ${fmt(b,to)}.`,
+      [{t:'Vazgeç',v:null},{t:'Rakam aynı kalsın',v:'keep'},{t:'Kura göre çevir',v:'conv',cls:'pri'}])}
+  if(!v){sel.value=from;return}
+  if(Number(i.net)>0&&!fxOk(from,to))toast('Kur girilmediği için fiyat rakamı aynı kaldı; gerekirse elle düzeltin',3500);
+  if(v==='conv')i.net=fromP(r2(showP(Number(i.net),i)*fxRate(from)/fxRate(to)),i);i.cur=to;saveDraft();renderItems()}
 $('#items').addEventListener('input',e=>{
   const f=e.target.dataset.f;if(!f)return;const k=e.target.closest('.it').dataset.k;const i=Q.items.find(x=>x.k===k);
   if(f==='detail'){i.detail=e.target.checked;saveDraft();return}
+  if(f==='cur'){itemCur(i,e.target);return}
   if(f==='price'){i.net=fromP(Number(e.target.value)||0,i)}else i[f]=e.target.value;
   if(f==='vat'){saveDraft();renderItems();bindVat();return}
-  if(f==='variant'){const p=PIDX[i.code];const v=p.variants.find(v=>v.v===i.variant);if(v){if(p.vatDefault==='excl')i.net=Number(v.price)||0;else if(v.price)i.net=toNet(v.price,p.cur);i.img=v.img||p.img;}renderItems();}
+  if(f==='variant'){const p=PIDX[i.code];const v=p.variants.find(v=>v.v===i.variant);if(v){if(p.vatDefault==='excl')i.net=Number(v.price)||0;else if(v.price)i.net=toNet(v.price,p.cur);if(v.price&&i.cur!==p.cur)i.net=fxConv(i.net,p.cur,i.cur);i.img=v.img||p.img;}renderItems();}
   else if(f==='cur'||f==='unit'){renderItems()}
   else{const lt=e.target.closest('.it').querySelector('.lt');lt.innerHTML=ltHTML(i);renderTotals()}
   saveDraft();
