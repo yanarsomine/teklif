@@ -23,7 +23,7 @@ Ana dalda (`main`) yapılan her değişiklik GitHub Pages ile birkaç dakikada c
 - WhatsApp gönder: PDF hazırlanır, telefonda wa.me / Web Share (dosya); bilgisayarda (Mac/Windows) `whatsapp://send` ile masaüstü uygulaması, açılmazsa `web.whatsapp.com/send` (mesaj panoya da kopyalanır).
 - Teklif koşullarında `terms.extra` ("Ek not", serbest metin) — Teklif notu ile Not arasında; boşsa PDF'te görünmez.
 - Teklif kalemleri ⠿ tutamağıyla sürüklenerek (fare/dokunmatik) ya da ↑/↓ ile sıralanır; PDF sırası `Q.items` sırasıdır.
-- Ürünler › "Para birimini değiştir": o an listelenen ürünlere (kategori/alt grup/arama) toplu `overrides` yazar: `cur` + kura göre çevrilmiş `price`/`vprices` (KDV dahil/hariç ayarı hesaba katılır, yuvarlama seçilir) ya da yalnız `cur`.
+- Ürünler listesinde her ürünün fiyatının üstünde para birimi seçimi (tek ürün; kura göre çevir / rakamlar aynı). Ürünler › "Para birimini değiştir": o an listelenen ürünlere (kategori/alt grup/arama) toplu `overrides` yazar: `cur` + kura göre çevrilmiş `price`/`vprices` (KDV dahil/hariç ayarı hesaba katılır, yuvarlama seçilir) ya da yalnız `cur`.
 - `custom/<kod>` programdan eklenen ürünler · `counter/quotes` sıradaki numara · `counter/rate` {eur, usd, date}
 - Roller `profiles.role`: `admin` (fiyat, ayar, ürün düzenler, kalıcı siler) / `staff` (teklif hazırlar) / `pending` (onay bekliyor, hiçbir veriye erişemez — yönetici Supabase › profiles tablosunda `staff` yapar).
 

@@ -1852,7 +1852,7 @@ function renderPAdmin(){
    <td class="u-th">${thumbOf(p)?`<img class="mini" src="${esc(thumbOf(p))}" alt="">`:''}</td>
    <td class="u-nm"><b>${esc(p.name)}</b>${p.hidden?' <span class="badge">gizli</span>':''}${p.custom?' <span class="badge">özel</span>':''}<div class="note">${esc(p.code)}</div></td>
    <td class="note u-sub">${esc(p.sub)}</td>
-   <td class="u-pr">${p.variants?.length?p.variants.map(v=>`<div class="kv" style="margin:2px 0"><span class="note" style="min-width:70px">${esc(v.v)}</span><input type="number" min="0" step="0.01" data-vp="${esc(v.v)}" value="${v.price||''}" style="width:100px;border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:var(--bg)"> ${CURS[p.cur]||'₺'}</div>`).join('')
+   <td class="u-pr"><select data-pcur aria-label="Para birimi" title="Bu ürünün para birimi" style="margin-bottom:4px;border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-size:12px;background:var(--bg)">${['TRY','EUR','USD'].map(c=>`<option value="${c}" ${(p.cur||'TRY')===c?'selected':''}>${CURS[c]} ${CURN[c]}</option>`).join('')}</select>${p.variants?.length?p.variants.map(v=>`<div class="kv" style="margin:2px 0"><span class="note" style="min-width:70px">${esc(v.v)}</span><input type="number" min="0" step="0.01" data-vp="${esc(v.v)}" value="${v.price||''}" style="width:100px;border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:var(--bg)"> ${CURS[p.cur]||'₺'}</div>`).join('')
      :`<div class="kv"><input type="number" min="0" step="0.01" data-p value="${p.price||''}" placeholder="Fiyat" style="width:110px;border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:var(--bg)"> ${CURS[p.cur]||'₺'}</div>`}</td>
    <td class="u-dr">${p.drw?`<a href="${esc(p.drw)}" target="_blank" rel="noopener"><img class="mini" src="${esc(p.drw)}" alt="çizim"></a>`:'<span class="note">yok</span>'}<br><label class="btn sm" style="display:inline-block;margin-top:4px">${p.drw?'Değiştir':'Yükle'}<input type="file" accept="image/*" data-up="drw" hidden></label></td>
    <td class="u-ph"><label class="btn sm" style="display:inline-block">Fotoğraf yükle<input type="file" accept="image/*" data-up="img" hidden></label></td>
@@ -1868,6 +1868,18 @@ $('#plist').addEventListener('input',e=>{const tr=e.target.closest('tr');if(!tr)
   if(e.target.matches('[data-p]')){clearTimeout(ptimer[code]);ptimer[code]=setTimeout(()=>{setOvr(code,{price:e.target.value===''?null:Number(e.target.value)});renderGrid();toast('Fiyat kaydedildi',1200)},700)}
   if(e.target.matches('[data-vp]')){clearTimeout(ptimer[code]);const vp={};tr.querySelectorAll('[data-vp]').forEach(x=>{if(x.value!=='')vp[x.dataset.vp]=Number(x.value)});ptimer[code]=setTimeout(()=>{setOvr(code,{vprices:vp});renderGrid();toast('Fiyat kaydedildi',1200)},700)}
 });
+/* Tek ürünün para birimi: listede fiyatın üstündeki seçim kutusu */
+function convPrice(x,from,to,rd){x=Number(x)||0;if(!x)return 0;const v=1+VATR()/100,rt=c=>c==='TRY'?1:c==='EUR'?Number(RATE.eur):Number(RATE.usd);
+  const y=x/(isIncl(from)?v:1)*rt(from)/rt(to)*(isIncl(to)?v:1);return Math.round(y/rd)*rd}
+$('#plist').addEventListener('change',async e=>{if(!e.target.matches('[data-pcur]'))return;const tr=e.target.closest('tr'),sel=e.target;const p=PIDX[tr.dataset.code];if(!p)return;
+  const from=p.cur||'TRY',to=sel.value;if(from===to)return;
+  const has=Number(p.price)>0||p.variants?.some(v=>Number(v.price)>0);const ok=RATE&&Number(RATE.eur)>0&&Number(RATE.usd)>0;
+  const rd=to==='TRY'?1:1;const ex=has&&ok?(()=>{const a=p.variants?.length?p.variants.find(v=>v.price>0).price:p.price;return ` Örnek: ${fmt(a,from)} → ${fmt(convPrice(a,from,to,rd),to)}.`})():'';
+  const v=has?await askDlg(p.name+': '+CURN[from]+' → '+CURN[to],(ok?'Fiyatlar güncel kura göre (€ '+rTxt(RATE.eur)+' · $ '+rTxt(RATE.usd)+') çevrilsin mi, yoksa rakamlar aynı mı kalsın?'+ex:'Kur bilgisi yok; rakamlar aynı kalacak.'),
+    [{t:'Vazgeç',v:null},{t:'Rakamlar aynı kalsın',v:'keep'},...(ok?[{t:'Kura göre çevir',v:'conv',cls:'pri'}]:[])]):'keep';
+  if(!v){sel.value=from;return}
+  const o={cur:to};if(v==='conv'){if(p.variants?.length){o.vprices=Object.fromEntries(p.variants.map(x=>[x.v,convPrice(x.price,from,to,rd)]));o.price=convPrice(p.price,from,to,rd)||null}else o.price=convPrice(p.price,from,to,rd)||null}
+  await setOvr(p.code,o);renderPAdmin();renderGrid();toast(p.name+': '+CURN[to]+(v==='conv'?' (fiyat çevrildi)':''),2500)});
 $('#plist').addEventListener('change',async e=>{const tr=e.target.closest('tr');if(!tr||!e.target.matches('[data-up]'))return;const code=tr.dataset.code;const f=e.target.files[0];if(!f)return;
   if(!assets){toast('Dosya yükleme bu görünümde kullanılamıyor');return}
   try{toast('Yükleniyor…',1500);const r=await assets.upload(f);await setOvr(code,{[e.target.dataset.up]:r.url});renderPAdmin();renderGrid();toast('Yüklendi')}
