@@ -69,6 +69,12 @@
 .nmin:hover,.nmin:focus{border-color:var(--line);background:var(--bg)}
 .ntin{width:100%;border:1px solid var(--line);border-radius:6px;padding:4px 7px;font-size:12px;background:var(--bg);resize:vertical;min-height:28px}
 .it .t{font-weight:600;font-size:13px}
+.it .drag{flex:none;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;padding:3px 6px;border-radius:6px;color:var(--muted);font-size:17px;line-height:1.2}
+.it .drag:hover{background:var(--soft,rgba(0,0,0,.05));color:var(--ink)}
+.it.dragging{opacity:.85;box-shadow:0 8px 24px rgba(0,0,0,.18);border-color:var(--acc,#1f3a5f);position:relative;z-index:5}
+.it.moved{outline:2px solid var(--acc,#1f3a5f);outline-offset:1px;transition:outline-color .6s}
+@media (max-width:640px){.it .nrow{flex-wrap:wrap;row-gap:4px}.it .nrow>div:first-child{order:2;flex:1 1 100%!important}.it .nrow>:nth-child(2){margin-left:auto}}
+body.dragmode,body.dragmode *{cursor:grabbing!important;user-select:none}
 .it .ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:end;margin-top:6px}
 .it .ctl .f{width:auto}
 .it .ctl input,.it .ctl select{padding:5px 7px;font-size:13px}
@@ -990,6 +996,7 @@ table.list th,.list th{font-size:11px;letter-spacing:.06em;text-transform:upperc
     <div class="pane-h"><h2>Ürünler ve fiyatlar</h2>
       <input class="search" id="pq" type="search" placeholder="Ürün ara">
       <label class="chk"><input type="checkbox" id="pnp"> Sadece fiyatı olmayanlar</label>
+      <button class="btn sm" id="bulkcur" type="button" title="Listelenen ürünlerin para birimini topluca değiştir">Para birimini değiştir</button>
       <button class="btn sm pri" id="newprod">+ Yeni ürün</button></div>
     <div class="pane-b note">Fiyat kutusuna yazdığınız fiyat kaydedilir ve tüm yeni tekliflerde kullanılır. Fiyatlar katalogdaki gibi girilir (TL ve Euro fiyatların KDV dahil olup olmadığı Ayarlar'dan değiştirilebilir). Çizimi olmayan ürünlere teknik çizim (PNG/JPG) yükleyebilirsiniz.</div>
     <div class="chips" id="pcats"></div><div class="chips subchips" id="psubs" hidden></div>
@@ -1191,10 +1198,10 @@ function renderItems(){
      <label class="imgbtn" title="Bilgisayardan resim ekle">${i.cimg?'Değiştir':'Resim'}<input type="file" accept="image/*" data-img="1" hidden></label>
      ${i.cimg?`<button class="imgbtn" data-rmimg="1" type="button">Kaldır</button>`:''}</div>
    <div style="min-width:0">
-    <div style="display:flex;gap:6px;align-items:start">
+    <div class="nrow" style="display:flex;gap:6px;align-items:start">
       <div style="flex:1;min-width:0"><input data-f="name" value="${esc(i.name)}" placeholder="${p?esc(p.name):'Kalem adı (ör. Montaj işçiliği)'}" aria-label="Teklifte görünecek ad" class="nmin">
       ${p?`<div class="note" style="font-weight:400;margin-top:2px">${specLine({...i,note:'',desc:''})}${i.name!==p.name?` · <a href="#" data-resetname="1">Orijinal adı kullan</a>`:''}</div>`:''}</div>
-      <button class="btn sm ghost" data-up="${n}" aria-label="Yukarı" ${n?'':'disabled'}>↑</button>
+      ${Q.items.length>1?`<span class="drag" data-drag="1" title="Sürükleyerek sırasını değiştirin" aria-hidden="true">⠿</span><button class="btn sm ghost" data-up="${n}" aria-label="Yukarı taşı" title="Yukarı taşı" ${n?'':'disabled'}>↑</button><button class="btn sm ghost" data-dn="${n}" aria-label="Aşağı taşı" title="Aşağı taşı" ${n<Q.items.length-1?'':'disabled'}>↓</button>`:''}
       <button class="btn sm ghost dng" data-del="${i.k}" aria-label="Kaldır">✕</button>
     </div>
     ${p&&p.variants?.length?`<div style="margin-top:4px;display:flex;gap:6px;align-items:center;min-width:0"><span class="note" style="font-weight:600;flex:none">${esc(p.varLabel||'Seçenek')}:</span><select data-f="variant" style="min-width:0;max-width:100%;flex:1 1 auto;border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-size:12px;background:var(--bg)">${p.variants.map(v=>`<option ${v.v===i.variant?'selected':''}>${esc(v.v)}</option>`).join('')}</select></div>`:''}
@@ -1411,8 +1418,23 @@ $('#items').addEventListener('click',e=>{
   const ri=e.target.closest('[data-rmimg]');if(ri){const i=Q.items.find(x=>x.k===ri.closest('.it').dataset.k);delete i.cimg;saveDraft();renderItems();return}
   const rn=e.target.closest('[data-resetname]');if(rn){e.preventDefault();const i=Q.items.find(x=>x.k===rn.closest('.it').dataset.k);i.name=PIDX[i.code].name;saveDraft();renderItems();return}
   const d=e.target.closest('[data-del]');if(d){Q.items=Q.items.filter(i=>i.k!==d.dataset.del);saveDraft();renderItems();renderGrid();return}
-  const u=e.target.closest('[data-up]');if(u){const n=+u.dataset.up;[Q.items[n-1],Q.items[n]]=[Q.items[n],Q.items[n-1]];saveDraft();renderItems()}
+  const u=e.target.closest('[data-up]');if(u){const n=+u.dataset.up;if(n<1)return;[Q.items[n-1],Q.items[n]]=[Q.items[n],Q.items[n-1]];saveDraft();renderItems();flashItem(Q.items[n-1].k)}
+  const dn=e.target.closest('[data-dn]');if(dn){const n=+dn.dataset.dn;if(n>=Q.items.length-1)return;[Q.items[n+1],Q.items[n]]=[Q.items[n],Q.items[n+1]];saveDraft();renderItems();flashItem(Q.items[n+1].k)}
 });
+function flashItem(k){const el=document.querySelector(`#items .it[data-k="${CSS.escape(k)}"]`);if(!el)return;el.classList.add('moved');el.scrollIntoView({block:'nearest',behavior:'smooth'});setTimeout(()=>el.classList.remove('moved'),700)}
+/* Kalemleri tutamaktan (⠿) sürükleyerek sıralama — fare ve dokunmatik */
+(()=>{const box=$('#items');let drag=null;
+  box.addEventListener('pointerdown',e=>{const h=e.target.closest('[data-drag]');if(!h||e.button>0)return;const it=h.closest('.it');if(!it)return;
+    e.preventDefault();drag={it,id:e.pointerId,y:e.clientY};it.classList.add('dragging');document.body.classList.add('dragmode')});
+  document.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;e.preventDefault();
+    const sibs=[...box.querySelectorAll('.it:not(.dragging)')];let before=null;
+    for(const s of sibs){const r=s.getBoundingClientRect();if(e.clientY<r.top+r.height/2){before=s;break}}
+    if(before)box.insertBefore(drag.it,before);else box.appendChild(drag.it);
+    const vh=innerHeight;if(e.clientY<70)scrollBy(0,-14);else if(e.clientY>vh-70)scrollBy(0,14)});
+  const end=e=>{if(!drag||e.pointerId!==drag.id)return;const k=drag.it.dataset.k;drag.it.classList.remove('dragging');document.body.classList.remove('dragmode');drag=null;
+    const ord=[...box.querySelectorAll('.it')].map(x=>x.dataset.k);const old=Q.items.map(i=>i.k).join();
+    Q.items.sort((a,b)=>ord.indexOf(a.k)-ord.indexOf(b.k));if(Q.items.map(i=>i.k).join()!==old){saveDraft();renderItems();flashItem(k)}};
+  document.addEventListener('pointerup',end);document.addEventListener('pointercancel',end);})();
 $('#addfree').onclick=()=>{Q.items.push({k:uid(),code:null,name:'',desc:'',qty:1,unit:'adet',net:0,vat:'excl',cur:'TRY',disc:0});saveDraft();renderItems();
   setTimeout(()=>{const ins=$$('#items [data-f="name"]');ins[ins.length-1]?.focus()},30)};
 $('#grid').addEventListener('click',e=>{const b=e.target.closest('[data-add]');if(!b)return;const sel=document.querySelector(`[data-var="${CSS.escape(b.dataset.add)}"]`);addItem(b.dataset.add,sel?+sel.value:0)});
@@ -1897,6 +1919,46 @@ $('#plist').addEventListener('click',e=>{const b=e.target.closest('[data-hide]')
 $('#pq').oninput=renderPAdmin;$('#pnp').onchange=renderPAdmin;
 $('#pcats').onclick=e=>{const b=e.target.closest('[data-pc]');if(!b)return;pcat=b.dataset.pc;psub='';renderPAdmin()};
 $('#psubs').onclick=e=>{const b=e.target.closest('[data-ps]');if(!b)return;psub=b.dataset.ps==='Hepsi'?'':b.dataset.ps;renderPAdmin()};
+/* Toplu para birimi değişikliği: o an listelenen ürünler (kategori / alt grup / arama filtresine göre) */
+function pAdminList(){const q=$('#pq').value.trim().toLocaleLowerCase('tr'),np=$('#pnp').checked;
+  return P.filter(p=>(!q||(p.name+' '+p.code+' '+p.sub).toLocaleLowerCase('tr').includes(q))&&(!np||!(p.variants?.length?p.variants.some(v=>v.price>0):p.price>0))&&(pcat==='Tümü'||p.cat===pcat)&&(!psub||p.sub===psub))}
+$('#bulkcur').onclick=()=>{
+  const list=pAdminList();if(!list.length){toast('Listede ürün yok');return}
+  const scope=pcat==='Tümü'?'Tüm ürünler':pcat+(psub?' › '+psub:'');
+  const cnt=c=>list.filter(p=>(p.cur||'TRY')===c).length;
+  const ok=RATE&&Number(RATE.eur)>0&&Number(RATE.usd)>0;
+  const m=document.createElement('div');m.className='modal';
+  m.innerHTML=`<form class="dlg" style="max-width:520px"><h2 style="margin:0;font-size:17px">Para birimini değiştir</h2>
+   <p class="note" style="margin:0"><b>${esc(scope)}</b>${$('#pq').value.trim()?' · arama: “'+esc($('#pq').value.trim())+'”':''} — ${list.length} ürün (${['TRY','EUR','USD'].filter(cnt).map(c=>cnt(c)+' '+CURN[c]).join(', ')}). Başka ürünler için önce üstten kategori seçin.</p>
+   <div class="fields">
+    <div class="f"><label for="bc-to">Yeni para birimi</label><select id="bc-to">${['TRY','EUR','USD'].map(c=>`<option value="${c}">${CURN[c]}</option>`).join('')}</select></div>
+    <div class="f"><label for="bc-rd">Yuvarlama</label><select id="bc-rd"><option value="0.01">Kuruşuna kadar</option><option value="1" selected>Tam sayı</option><option value="10">10'a</option><option value="100">100'e</option></select></div>
+   </div>
+   <label class="chk"><input type="radio" name="bc-m" value="conv" ${ok?'checked':'disabled'}> Fiyatları güncel kura göre çevir${ok?` <span class="note">(€ ${esc(rTxt(RATE.eur))} · $ ${esc(rTxt(RATE.usd))}, ${esc(trDate(RATE.date))})</span>`:' <span class="note">(kur yok)</span>'}</label>
+   <label class="chk"><input type="radio" name="bc-m" value="keep" ${ok?'':'checked'}> Yalnız para birimini değiştir, rakamlar aynı kalsın</label>
+   <p class="note" id="bc-ex" style="margin:0"></p>
+   <p class="note" style="margin:0">Kayıtlı teklifler değişmez. KDV dahil/hariç ayarı (Ayarlar) iki para biriminde farklıysa çeviride hesaba katılır.</p>
+   <div class="askb"><button class="btn" type="button" id="bc-x">Vazgeç</button><button class="btn pri" type="submit" id="bc-ok">Uygula</button></div></form>`;
+  document.body.appendChild(m);m.addEventListener('click',e=>{if(e.target===m)m.remove()});m.querySelector('#bc-x').onclick=()=>m.remove();
+  const rt=c=>c==='TRY'?1:c==='EUR'?Number(RATE.eur):Number(RATE.usd);
+  const plan=()=>{const to=m.querySelector('#bc-to').value,rd=Number(m.querySelector('#bc-rd').value),conv=m.querySelector('[name=bc-m]:checked')?.value==='conv',v=1+VATR()/100;
+    const cv=(x,from)=>{x=Number(x)||0;if(!x)return 0;if(!conv)return x;const net=x/(isIncl(from)?v:1)*rt(from)/rt(to)*(isIncl(to)?v:1);return Math.round(net/rd)*rd};
+    return {to,conv,items:list.filter(p=>(p.cur||'TRY')!==to).map(p=>{const from=p.cur||'TRY';const o={cur:to};
+      if(p.variants?.length){o.vprices=Object.fromEntries(p.variants.map(x=>[x.v,cv(x.price,from)]));o.price=cv(p.price,from)||null}else o.price=cv(p.price,from)||null;
+      return {p,from,o}})}};
+  const prev=()=>{const pl=plan();const ex=pl.items.find(x=>Number(x.p.price)>0||x.p.variants?.some(v=>v.price>0));
+    m.querySelector('#bc-ok').textContent=pl.items.length?pl.items.length+' ürünü güncelle':'Değişecek ürün yok';m.querySelector('#bc-ok').disabled=!pl.items.length;
+    m.querySelector('#bc-ex').innerHTML=ex?(()=>{const a=ex.p.variants?.length?ex.p.variants.find(v=>v.price>0)?.price:ex.p.price,b=ex.p.variants?.length?ex.o.vprices[ex.p.variants.find(v=>v.price>0).v]:ex.o.price;
+      return `Örnek: ${esc(ex.p.name)} — ${esc(fmt(a,ex.from))} → <b>${esc(fmt(b,pl.to))}</b>`})():''};
+  m.addEventListener('change',prev);prev();
+  m.querySelector('form').onsubmit=async e=>{e.preventDefault();const pl=plan();if(!pl.items.length)return;
+    if(!db){toast('Kayıt servisi kullanılamıyor');return}
+    const btn=m.querySelector('#bc-ok');btn.disabled=true;let done=0,bad=0;
+    for(let i=0;i<pl.items.length;i+=8){await Promise.all(pl.items.slice(i,i+8).map(async({p,o})=>{const code=p.code;const n={...(OVR[code]||{}),...o};
+      try{await db.doc('overrides/'+code.replace(/[^A-Za-z0-9_-]/g,'_')).set({code,...n});OVR[code]=n;done++}catch(err){bad++}}));btn.textContent=`Kaydediliyor… ${done+bad}/${pl.items.length}`}
+    buildProducts();renderPAdmin();renderGrid();m.remove();
+    toast(bad?`${done} ürün güncellendi, ${bad} ürün kaydedilemedi`:`${done} ürünün para birimi ${CURN[pl.to]} yapıldı`,4000)};
+};
 $('#newprod').onclick=()=>{
   const m=document.createElement('div');m.className='modal';
   m.innerHTML=`<form class="dlg" id="npf"><h2 style="margin:0;font-size:17px">Yeni ürün</h2>
