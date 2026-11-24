@@ -1661,8 +1661,31 @@ function scheduleArchive(){
 }
 /* Açılan kayıtlı teklifin PDF'i arşivde (yedek için) yoksa arka planda oluşturup yükle */
 async function ensureArchived(id){if(!archive||!id||!archive.link)return;try{await archive.link(id,1)}catch(e){if(Q&&Q.id===id&&!isDirty())scheduleArchive()}}
+/* Arşivde PDF'i olmayan kayıtlı teklifleri arka planda tamamla (yedek müşteri klasörlerine teklif PDF'ini buradan alır).
+   Teklif ekranı açık değilken, teklifi geçici olarak Q'ya alıp PDF üretir, sonra Q'yu geri koyar. Oturum başına teklif başına bir kez dener. */
+const bgTried=new Set();let bgTimer=null,bgRun=false,bgSwap=null;
+function bgArchiveSoon(){clearTimeout(bgTimer);bgTimer=setTimeout(bgArchive,8000)}
+async function bgArchive(){
+  if(bgRun||!archive||!archive.link||!archive.savePdf||document.body.classList.contains('ro'))return;bgRun=true;
+  try{
+    for(const q of QUOTES.slice()){
+      if(!q.id||bgTried.has(q.id)||q.silindi)continue;
+      try{await archive.link(q.id,1);bgTried.add(q.id);continue}catch(e){}
+      // teklif ekranında ya da başka PDF işi sürerken bekle
+      let w=0;while((busy||archP||!$('#v-teklif').hidden||document.hidden)&&w<120){await new Promise(r=>setTimeout(r,5000));w++}
+      if(busy||archP||!$('#v-teklif').hidden)break;
+      bgTried.add(q.id);
+      if(!await libs(true))break;
+      const keep=Q;const tmp=JSON.parse(JSON.stringify(q));['_ts','totals','offer','updatedAt'].forEach(k=>delete tmp[k]);
+      bgSwap=keep;Q=tmp;
+      try{const {blob}=await renderPdfBlob();Q=keep;bgSwap=null;await withTimeout(archive.savePdf(q.id,blob),40000,'Arşiv');console.info('Arşive eklendi:',q.id)}
+      catch(e){console.warn('Arka plan arşiv',q.id,e)}
+      finally{if(bgSwap){Q=bgSwap;bgSwap=null}saveDraft();if(!$('#v-teklif').hidden){bindQuoteFields();renderItems();renderGrid()}}
+    }
+  }finally{bgRun=false}
+}
 /* Önizleme/PDF/Gönder öncesi: bekleyen arka plan arşivini bitir (aynı sayfa alanını kullanırlar) */
-async function pdfIdle(){clearTimeout(archTimer);if(archP){toast('PDF hazırlanıyor, bir saniye…',1800);try{await withTimeout(archP,20000,'Arşiv')}catch(e){archP=null}}}
+async function pdfIdle(){clearTimeout(archTimer);for(let i=0;bgSwap&&i<60;i++)await new Promise(r=>setTimeout(r,500));if(archP){toast('PDF hazırlanıyor, bir saniye…',1800);try{await withTimeout(archP,20000,'Arşiv')}catch(e){archP=null}}}
 /* PDF kütüphaneleri ilk kullanımda yüklenir (açılışı hızlandırır) */
 let libsP=null;
 window.loadScript=loadScript;function loadScript(src){return withTimeout(new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error(src+' yüklenemedi'));document.head.appendChild(s)}),25000,'PDF araçlarının yüklenmesi')}
@@ -2360,7 +2383,7 @@ async function connect(){
   db.collection('custom').onSnapshot(s=>{CUSTOM={};s.docs.forEach(d=>{const x=d.data();CUSTOM[x.code]=x});buildProducts();renderCats();renderGrid();if(!$('#v-urunler').hidden)renderPAdmin();setStatus(P.length+' ürün · kayıtlar bağlı','on')},()=>connErr(true,'Özel ürünler'));
   db.collection('quotes').onSnapshot(s=>{QALL=s.docs.map(d=>({id:d.id,...d.data(),_ts:d.updatedAt})).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));QUOTES=QALL.filter(x=>!x.silindi);
     if(Q&&Q.id){const sv=QALL.find(x=>x.id===Q.id);if(sv&&!isDirty()&&sv._ts!==Q._ts&&baseSig(sv)===baseSig(Q)){Q._ts=sv._ts;['customerId','jobId','newJob','noLink'].forEach(k=>{if(k in sv)Q[k]=sv[k]});Q._base=baseSig(Q);saveDraft();markClean()}}
-    renderSaved();if(!$('#v-panel').hidden)renderDash();window.CRM?.refresh();connErr(false)},e=>connErr(true,'Kayıtlı teklifler'));
+    renderSaved();if(!$('#v-panel').hidden)renderDash();window.CRM?.refresh();connErr(false);bgArchiveSoon()},e=>connErr(true,'Kayıtlı teklifler'));
 }
 document.addEventListener('click',async e=>{if(!e.target.closest('[data-logout]'))return;try{const u=await claude.use('user');if(u?.signOut)await u.signOut()}catch(err){location.reload()}});
 
