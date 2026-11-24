@@ -1659,6 +1659,8 @@ function scheduleArchive(){
     archP=(async()=>{try{if(!await libs(true))return;const {blob}=await renderPdfBlob();await withTimeout(archivePdf(blob),30000,'Arşiv')}catch(e){console.warn(e)}})().finally(()=>{archP=null});
   },1500);
 }
+/* Açılan kayıtlı teklifin PDF'i arşivde (yedek için) yoksa arka planda oluşturup yükle */
+async function ensureArchived(id){if(!archive||!id||!archive.link)return;try{await archive.link(id,1)}catch(e){if(Q&&Q.id===id&&!isDirty())scheduleArchive()}}
 /* Önizleme/PDF/Gönder öncesi: bekleyen arka plan arşivini bitir (aynı sayfa alanını kullanırlar) */
 async function pdfIdle(){clearTimeout(archTimer);if(archP){toast('PDF hazırlanıyor, bir saniye…',1800);try{await withTimeout(archP,20000,'Arşiv')}catch(e){archP=null}}}
 /* PDF kütüphaneleri ilk kullanımda yüklenir (açılışı hızlandırır) */
@@ -2148,7 +2150,7 @@ async function openQuote(id,force){
   const src=QALL.find(x=>x.id===id);if(!src){toast('Teklif bulunamadı');return}
   Q=JSON.parse(JSON.stringify(src));{const mv=Q.opts?.vat==='incl'?'incl':'excl';Q.items.forEach(i=>{if(!i.vat)i.vat=mv})}
   if(Q.vatRate==null)Q.vatRate=Number(S.vat)||0;
-  delete Q.totals;delete Q.offer;delete Q.updatedAt;Q._base=baseSig(Q);saveDraft();markClean();bindQuoteFields();renderItems();renderGrid();setPane('quote');go('teklif');toast('Teklif '+Q.no+' açıldı');
+  delete Q.totals;delete Q.offer;delete Q.updatedAt;Q._base=baseSig(Q);saveDraft();markClean();bindQuoteFields();renderItems();renderGrid();setPane('quote');go('teklif');toast('Teklif '+Q.no+' açıldı');ensureArchived(Q.id);
 }
 function revNo(base,n){return base+'-R'+n}
 function nextRevNo(base){let n=0;QALL.forEach(x=>{if((x.revBase||x.no)===base)n=Math.max(n,Number(x.rev)||0)});return n+1}

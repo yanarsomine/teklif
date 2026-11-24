@@ -88,7 +88,7 @@ while IFS='|' read -r KOVA UZAK YEREL EP TS; do
     if [ "$KOVA" = teklifler ]; then YENI=$((YENI + 1)); else YENIDOSYA=$((YENIDOSYA + 1)); fi
   fi
 done < "$TMP/plan.txt"
-[ "$EKSIK" -eq 0 ] || PDFHATA="$PDFHATA ($EKSIK dosya sunucuda bulunamadı)"
+[ "$EKSIK" -eq 0 ] || PDFHATA="$PDFHATA ($EKSIK dosya arşivde yok; eksik teklif PDF'i, teklif programda açılınca arşive eklenir)"
 listele uploads "" > "$TMP/resimler.txt"
 while IFS='|' read -r YOL EP TS; do
   [ -n "$YOL" ] || continue

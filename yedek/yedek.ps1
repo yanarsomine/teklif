@@ -164,7 +164,7 @@ try {
     $r2 = Getir 'musteri-dosyalari' ([string]$f.data.assetId) (Yer (Join-Path (Join-Path $MusD $kl[$cid]) $alt) $ad $f.id) $null
     if ($r2 -eq $true) { $yeniDosya++ } elseif ($null -eq $r2) { $eksik++ }
   }
-  if ($eksik) { $pdfHata += " ($eksik dosya sunucuda bulunamadı)" }
+  if ($eksik) { $pdfHata += " ($eksik dosya arşivde yok; eksik teklif PDF'i, teklif programda açılınca arşive eklenir)" }
   try {
     foreach ($o in (Liste 'uploads' '')) {
       $hed = Join-Path $UrD ($o.yol -replace '/', '\')
