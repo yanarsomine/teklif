@@ -3757,11 +3757,20 @@ async function boot(){
 }
 boot();
 /* Çevrimdışı açılış için hafif önbellek (ağ önce; internet yoksa son sürüm) */
+/* Yeni sürüm yayınlandıysa haber ver: index.html'in ETag'i değişince "Yenile" şeridi */
+(()=>{if(location.protocol!=='https:')return;let first=null,shown=false;
+  const tag=async()=>{try{const r=await fetch(location.pathname.replace(/[^/]*$/,'')+'index.html',{method:'HEAD',cache:'no-store'});return r.headers.get('etag')||r.headers.get('last-modified')}catch(e){return null}};
+  const check=async()=>{if(shown||document.hidden)return;const t=await tag();if(!t)return;if(!first){first=t;return}if(t===first)return;shown=true;
+    const b=document.createElement('div');b.setAttribute('role','status');b.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom));z-index:9999;background:#1f2a44;color:#fff;padding:10px 12px 10px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);display:flex;gap:12px;align-items:center;font-size:14px;max-width:calc(100vw - 24px)';
+    b.innerHTML='<span>Programın yeni sürümü yayınlandı.</span><button type="button" style="background:#fff;color:#1f2a44;border:0;border-radius:7px;padding:7px 12px;font-weight:600;font:inherit;cursor:pointer">Yenile</button>';
+    b.querySelector('button').onclick=async()=>{if(typeof isDirty==='function'&&isDirty()&&!confirm('Kaydedilmemiş değişiklikleriniz var. Yine de yenilensin mi? (Taslak bu cihazda saklı kalır.)'))return;try{const r=await navigator.serviceWorker?.getRegistration();await r?.update()}catch(e){}location.reload()};
+    document.body.appendChild(b)};
+  check();setInterval(check,5*60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)check()});})();
 if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 /* Ad soyad alanları: boşluktan sonraki harf büyük başlar (Türkçe: i→İ) */
-(()=>{const IDS=new Set(['c-name','c-contact','s-by','f_ad','i_ad']);
+(()=>{const IDS=new Set(['c-name','c-contact','c-project','s-by','f_ad','i_ad']);
   const cap=v=>v.replace(/(^|[\s\-'’.(])(\p{Ll})/gu,(m,a,b)=>a+b.toLocaleUpperCase('tr-TR'));
-  document.addEventListener('input',e=>{const t=e.target;if(!t||!IDS.has(t.id)||e.isComposing)return;
+  document.addEventListener('input',e=>{const t=e.target;if(!t||!(IDS.has(t.id)||(t.matches&&t.matches('#items input[data-f="name"]')))||e.isComposing)return;
     const v=t.value,n=cap(v);if(n===v)return;const s=t.selectionStart,en=t.selectionEnd;t.value=n;try{t.setSelectionRange(s,en)}catch(_){}},true);
 })();
 </script>

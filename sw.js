@@ -1,7 +1,7 @@
 /* Yanar Şömine – çevrimdışı açılış için önbellek.
    Strateji: önce ağ (her zaman en güncel sürüm), ağ yoksa önbellekteki son sürüm.
    Yalnız bu sitenin dosyaları önbelleğe alınır; Supabase (kayıtlar) hiçbir zaman önbellekten verilmez. */
-const CACHE = 'ys-v1';
+const CACHE = 'ys-v2';
 const SHELL = ['./', 'index.html', 'backend.js', 'config.js', 'logo.png', 'data/products.json', 'data/thumbs-idx.json',
   'vendor/fonts/IBMPlexSans-var.woff', 'vendor/fonts/Figtree-var.woff', 'manifest.webmanifest', 'apple-touch-icon.png'];
 
@@ -19,7 +19,9 @@ self.addEventListener('fetch', e => {
   e.respondWith((async () => {
     const c = await caches.open(CACHE);
     try {
-      const res = await fetch(req);
+      // sayfa, kod ve veri dosyaları her seferinde sunucuya sorulur (değişmediyse 304, hızlı); resimler normal önbellekle
+      const fresh = req.mode === 'navigate' || /\.(html|js|json|webmanifest)$/.test(url.pathname) || url.pathname.endsWith('/');
+      const res = fresh ? await fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }) : await fetch(req);
       if (res.ok && res.type === 'basic') c.put(req, res.clone()).catch(() => {});
       return res;
     } catch (err) {
