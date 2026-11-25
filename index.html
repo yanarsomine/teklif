@@ -3770,10 +3770,18 @@ boot();
     document.body.appendChild(b)};
   check();setInterval(check,5*60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)check()});})();
 if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
-/* Ad soyad alanları: boşluktan sonraki harf büyük başlar (Türkçe: i→İ) */
-(()=>{const IDS=new Set(['c-name','c-contact','c-project','s-by','f_ad','i_ad']);
-  const cap=v=>v.replace(/(^|[\s\-'’.(])(\p{Ll})/gu,(m,a,b)=>a+b.toLocaleUpperCase('tr-TR'));
-  document.addEventListener('input',e=>{const t=e.target;if(!t||!(IDS.has(t.id)||(t.matches&&t.matches('#items input[data-f="name"]')))||e.isComposing)return;
+/* Yazı alanlarının tamamında boşluktan sonraki harf büyük başlar (Türkçe: i→İ).
+   Hariç: e-posta, telefon, web, IBAN, şifre, sayı, arama kutuları ve data-nocap alanlar; rakamdan sonra gelen birimler (150 mm, 20 kg) küçük kalır. */
+(()=>{const NO=new Set(['c-email','c-phone','s-mail','s-web','s-bank','s-prefix','s-wa','s-phone','s-byph','f_tel','f_mail','i_tel','i_mail','u_tutar']);
+  const BADT=/^(email|password|number|tel|url|search|date|time|datetime-local|month|week|color|range|file|checkbox|radio|hidden)$/;
+  const ok=t=>{if(!t||t.readOnly||t.disabled)return false;if(t.tagName==='TEXTAREA')return !NO.has(t.id)&&!t.closest('[data-nocap]')&&!t.hasAttribute('data-nocap');
+    if(t.tagName!=='INPUT')return false;const ty=(t.getAttribute('type')||'text').toLowerCase();if(BADT.test(ty))return false;
+    if(NO.has(t.id)||t.hasAttribute('data-nocap')||t.closest('[data-nocap]'))return false;
+    const ac=(t.getAttribute('autocomplete')||'')+' '+(t.name||'')+' '+(t.id||'');if(/mail|password|user|tel|phone|iban|web|url|link|konum/i.test(ac))return false;return true};
+  const UNITS=/^(mm|cm|m|mt|m²|m2|m³|m3|km|kg|gr|g|ton|lt|l|kw|kwh|w|adet|ad|derece|sn|dk|saat|gün|ay|yıl)$/;
+  const cap=v=>v.replace(/(^|[\s\-(])(\p{Ll})/gu,(m,a,b,off,str)=>{const w=(str.slice(off+a.length).match(/^[\p{L}²³0-9]+/u)||[''])[0];
+    return /\d\s?$/.test(str.slice(Math.max(0,off-3),off+a.length))&&UNITS.test(w)?m:a+b.toLocaleUpperCase('tr-TR')});
+  document.addEventListener('input',e=>{const t=e.target;if(e.isComposing||!ok(t))return;
     const v=t.value,n=cap(v);if(n===v)return;const s=t.selectionStart,en=t.selectionEnd;t.value=n;try{t.setSelectionRange(s,en)}catch(_){}},true);
 })();
 </script>
