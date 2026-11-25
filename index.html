@@ -1205,7 +1205,8 @@ function renderItems(){
       <button class="btn sm ghost dng" data-del="${i.k}" aria-label="Kaldır">✕</button>
     </div>
     ${p&&p.variants?.length?`<div style="margin-top:4px;display:flex;gap:6px;align-items:center;min-width:0"><span class="note" style="font-weight:600;flex:none">${esc(p.varLabel||'Seçenek')}:</span><select data-f="variant" style="min-width:0;max-width:100%;flex:1 1 auto;border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-size:12px;background:var(--bg)">${p.variants.map(v=>`<option ${v.v===i.variant?'selected':''}>${esc(v.v)}</option>`).join('')}</select></div>`:''}
-    <div style="margin-top:4px"><textarea data-f="note" rows="${(i.note||i.desc)?2:1}" class="ntin" placeholder="${p&&p.made?'Açıklama: taş türü, iç hazne, ölçü (ör. Carrara mermer, Tzaki Eco 75, 160 cm)':'Açıklama (isteğe bağlı) – teklifte ürünün altında ve ürün sayfasında görünür'}">${esc(i.note||i.desc||'')}</textarea></div>
+    <div style="margin-top:4px"><textarea data-f="note" rows="${(i.note||i.desc)?2:1}" class="ntin" placeholder="${p&&p.made?'Açıklama: taş türü, iç hazne, ölçü (ör. Carrara mermer, Tzaki Eco 75, 160 cm)':'Açıklama (isteğe bağlı) – teklifte ürünün altında ve ürün sayfasında görünür'}">${esc(i.note||i.desc||'')}</textarea>
+      ${p?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:2px"><button class="btn sm ghost" type="button" data-edtxt="${i.k}" title="Ürün sayfasındaki açıklama, öne çıkan özellikler ve teknik özellikleri yalnız bu teklif için düzenleyin">✎ Ürün metnini düzenle</button>${(i.short!=null||i.feats||i.specs)?'<span class="note" style="color:var(--acc,#1f3a5f);font-weight:600">Bu teklife özel metin</span>':''}</div>`:''}</div>
     <div class="ctl">
       <div class="f"><label>Miktar${i.unit&&i.unit!=='adet'?' ('+esc(i.unit)+')':''}</label><input class="w-q" type="number" min="0" step="any" data-f="qty" value="${i.qty}"></div>
       ${!p?`<div class="f"><label>Birim</label><select data-f="unit">${['adet','m','m²','paket','rulo','takım','set','gün','sefer','iş'].map(u=>`<option ${u===(i.unit||'adet')?'selected':''}>${u}</option>`).join('')}</select></div>`:''}
@@ -1430,6 +1431,7 @@ $('#items').addEventListener('change',async e=>{if(!e.target.matches('[data-img]
 $('#items').addEventListener('click',e=>{
   const ri=e.target.closest('[data-rmimg]');if(ri){const i=Q.items.find(x=>x.k===ri.closest('.it').dataset.k);delete i.cimg;saveDraft();renderItems();return}
   const rn=e.target.closest('[data-resetname]');if(rn){e.preventDefault();const i=Q.items.find(x=>x.k===rn.closest('.it').dataset.k);i.name=PIDX[i.code].name;saveDraft();renderItems();return}
+  const et=e.target.closest('[data-edtxt]');if(et){editItemText(Q.items.find(x=>x.k===et.dataset.edtxt));return}
   const d=e.target.closest('[data-del]');if(d){Q.items=Q.items.filter(i=>i.k!==d.dataset.del);saveDraft();renderItems();renderGrid();return}
   const u=e.target.closest('[data-up]');if(u){const n=+u.dataset.up;if(n<1)return;[Q.items[n-1],Q.items[n]]=[Q.items[n],Q.items[n-1]];saveDraft();renderItems();flashItem(Q.items[n-1].k)}
   const dn=e.target.closest('[data-dn]');if(dn){const n=+dn.dataset.dn;if(n>=Q.items.length-1)return;[Q.items[n+1],Q.items[n]]=[Q.items[n],Q.items[n+1]];saveDraft();renderItems();flashItem(Q.items[n+1].k)}
@@ -1460,9 +1462,33 @@ $('#newq').onclick=async()=>{if(!await confirmLeave())return;Q=blankQuote();save
 function footHTML(n,total){return `<div class="d-foot"><div>${esc(S.title)}<br>${esc(S.addr)}</div><div style="text-align:right;white-space:nowrap">Tel ${esc(S.phone)}<br>${esc(S.mail)} · ${esc(S.web)}<br>Sayfa ${n} / ${total}</div></div>`}
 function headHTML(no){return `<div class="d-head"><img src="logo.png" alt=""><div class="ttl"><h1>FİYAT TEKLİFİ</h1><div>Teklif No: <b>${esc(no)}</b></div><div>Tarih: ${trDate(Q.date)} · Geçerlilik: ${trDate(addDays(Q.date,Q.valid))}</div></div></div>`}
 function miniHead(no,title){return `<div class="d-head" style="padding-bottom:10px"><img src="logo.png" alt="" style="height:30px"><div class="ttl"><div class="d-cont">${esc(title)}</div><div>Teklif No: ${esc(no)} · ${trDate(Q.date)}</div></div></div>`}
-function pspecs(p,variant,it){if(it)return pspecs(p,variant).map(([k,v])=>[k,String(v).replace('{miktar}',fmtQ(it.qty)+' '+(it.unit||''))]);const v=p?.variants?.find(x=>x.v===variant);if(!v?.specs?.length)return p?.specs||[];const k=new Set(v.specs.map(x=>x[0]));return [...v.specs,...(p.specs||[]).filter(x=>!k.has(x[0])&&x[0]!=='Ölçü seçenekleri')]}
+function pspecs(p,variant,it){if(it)return (Array.isArray(it.specs)?it.specs:pspecs(p,variant)).map(([k,v])=>[k,String(v).replace('{miktar}',fmtQ(it.qty)+' '+(it.unit||''))]);const v=p?.variants?.find(x=>x.v===variant);if(!v?.specs?.length)return p?.specs||[];const k=new Set(v.specs.map(x=>x[0]));return [...v.specs,...(p.specs||[]).filter(x=>!k.has(x[0])&&x[0]!=='Ölçü seçenekleri')]}
 function fmtQ(q){return (Number(q)||0).toLocaleString('tr-TR',{maximumFractionDigits:2})}
-function specLine(i){const p=PIDX[i.code];const nt=i.note||i.desc;if(nt){const t=nt.trim().replace(/[ \t]+/g,' ');return esc(t.length>520?t.slice(0,t.lastIndexOf(' ',515))+'…':t).replace(/\n/g,'<br>')}if(!p)return '';if(p.made){const t=(p.short||'').split('. ')[0];return esc(t.length>110?t.slice(0,t.lastIndexOf(' ',105))+'…':t)}
+/* Teklife özel ürün metni: açıklama, öne çıkan özellikler, teknik özellikler (katalogdaki ürün değişmez) */
+function editItemText(i){if(!i)return;const p=PIDX[i.code];if(!p)return;
+  const sh=i.short??p.short??'',fe=(i.feats||p.feats||[]).join('\n');
+  const spText=Array.isArray(i.specs)?i.specs.map(s=>s[0]+': '+s[1]).join('\n'):pspecs(p,i.variant).map(s=>s[0]+': '+s[1]).join('\n');
+  const m=document.createElement('div');m.className='modal';
+  const ta=(id,l,v,r,hint)=>`<div class="f"><label for="${id}">${l}</label><textarea id="${id}" rows="${r}" style="width:100%;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--bg);color:var(--ink);resize:vertical">${esc(v)}</textarea>${hint?`<span class="note">${hint}</span>`:''}</div>`;
+  m.innerHTML=`<form class="dlg" style="max-width:640px;width:100%;max-height:92vh;overflow:auto"><h2 style="margin:0;font-size:17px">Ürün metni · ${esc(i.name||p.name)}</h2>
+   <p class="note" style="margin:0">Yalnız bu teklifin PDF'indeki ürün sayfasına uygulanır; Ürünler'deki katalog metni değişmez.${i.variant?' Seçenek: '+esc(i.variant)+'.':''}</p>
+   ${ta('it-short','Ürün açıklaması',sh,5)}
+   ${ta('it-feats','Öne çıkan özellikler (her satıra bir madde)',fe,5)}
+   ${ta('it-specs','Teknik özellikler (her satıra "Özellik: Değer")',spText,8,'Seçeneği sonradan değiştirirseniz bu teknik özellikler değişmez; gerekirse "Katalogdaki metne dön"e basın.')}
+   <div class="askb" style="flex-wrap:wrap"><button class="btn" type="button" id="it-reset" ${(i.short!=null||i.feats||i.specs)?'':'disabled'}>Katalogdaki metne dön</button><span style="flex:1"></span><button class="btn" type="button" id="it-x">Vazgeç</button><button class="btn pri" type="submit">Kaydet</button></div></form>`;
+  document.body.appendChild(m);document.body.classList.add('modal-open');
+  const close=()=>{m.remove();document.body.classList.remove('modal-open')};
+  m.addEventListener('click',e=>{if(e.target===m)close()});m.querySelector('#it-x').onclick=close;
+  const lines=v=>v.split('\n').map(x=>x.trim()).filter(Boolean);
+  m.querySelector('#it-reset').onclick=()=>{delete i.short;delete i.feats;delete i.specs;saveDraft();renderItems();close();toast('Katalogdaki ürün metnine dönüldü')};
+  m.querySelector('form').onsubmit=e=>{e.preventDefault();const g=id=>m.querySelector(id).value;
+    const nsh=g('#it-short').trim(),nfe=lines(g('#it-feats')),nsp=lines(g('#it-specs')).map(l=>{const k=l.indexOf(':');return k>0?[l.slice(0,k).trim(),l.slice(k+1).trim()]:[l,'']});
+    if(nsh!==(p.short||'').trim())i.short=nsh;else delete i.short;
+    if(nfe.join('\n')!==(p.feats||[]).join('\n'))i.feats=nfe;else delete i.feats;
+    if(nsp.map(s=>s.join(': ')).join('\n')!==pspecs(p,i.variant).map(s=>s.join(': ')).join('\n'))i.specs=nsp;else delete i.specs;
+    saveDraft();renderItems();close();toast(i.short!=null||i.feats||i.specs?'Ürün metni bu teklif için güncellendi':'Değişiklik yok')};
+  setTimeout(()=>m.querySelector('#it-short').focus(),50)}
+function specLine(i){const p=PIDX[i.code];const nt=i.note||i.desc;if(nt){const t=nt.trim().replace(/[ \t]+/g,' ');return esc(t.length>520?t.slice(0,t.lastIndexOf(' ',515))+'…':t).replace(/\n/g,'<br>')}if(!p)return '';if(p.made){const t=(i.short??p.short??'').split('. ')[0];return esc(t.length>110?t.slice(0,t.lastIndexOf(' ',105))+'…':t)}
   const parts=[];if(i.variant)parts.push((i.varLabel||'Seçenek')+': '+i.variant);
   const pri=[/^(Dış )?[Öö]lçü|^Boyut/,/^Cam tipi/,/[Gg]üç(?! aralığı)|Nominal güç|Anma gücü|Isıtma kapasitesi/,/Isıtma alanı/,/^Yakıt/,/Set içeriği|Kaplama alanı|Çap seçenekleri|Taban|Sıcaklık dayanımı|Malzeme|Uzunluk|^İç cidar|^Boy$/];
   const skip=/^(Seri|Model|Garanti|Belge|Kontrol|Elektrik bağlantısı)$/;const used=new Set(i.variant?[i.varLabel||'Seçenek']:[]);
@@ -1507,7 +1533,7 @@ function monCard(i){const p=PIDX[i.code];const img=i.cimg||itemImg(i);
   const specs=pspecs(p,i.variant,i).filter(x=>!['Seri','Model','Kullanım'].includes(x[0])).slice(0,4);
   return `<div class="m-card"><div class="m-img">${img?`<img src="${esc(img)}" alt="">`:''}</div><div class="m-bd">
    <div class="m-nm">${esc(i.name||p.name)}</div>${i.note?`<div class="m-v" style="color:#3d3533;font-weight:500">${esc(i.note)}</div>`:''}${i.variant?`<div class="m-v">${esc(i.varLabel||'Seçenek')}: ${esc(i.variant)}</div>`:''}
-   ${p.short?`<div class="m-ds">${esc(p.short.length>170?p.short.slice(0,p.short.lastIndexOf(' ',165))+'…':p.short)}</div>`:''}
+   ${(()=>{const sh=i.short??p.short;return sh?`<div class="m-ds">${esc(sh.length>170?sh.slice(0,sh.lastIndexOf(' ',165))+'…':sh)}</div>`:''})()}
    ${specs.map(s=>`<div class="r"><span>${esc(s[0])}</span><span>${esc(s[1])}</span></div>`).join('')}
    ${i.inPkg?`<div class="m-qp"><span>${i.qty?qtyTxt(i):''}</span><b style="color:#9a1b1f">Paket fiyata dahil</b></div>`:Q.opts.unitp?`<div class="m-qp"><span>${qtyTxt(i)}</span><b>${fmt(unitShow(i),i.cur)} / ${esc(i.unit||'adet')}</b></div>`:''}
   </div></div>`}
@@ -1524,8 +1550,8 @@ function detailPageHTML(i,no){const p=PIDX[i.code];const img=itemImg(i);
    ${p.gallery&&!i.cimg&&!showDrw?`<div style="display:grid;grid-template-columns:repeat(${p.gallery.length},1fr);gap:8px">${p.gallery.map(g=>`<div class="p-img" style="height:120px;padding:4px"><img src="${esc(g)}" alt=""></div>`).join('')}</div>`:''}</div>${img?'':'</div>'}
    <div><div class="p-sub">${esc(p.shape||p.sub)}</div><div class="p-name">${esc(i.name||p.name)}</div>${i.variant?`<div style="font-weight:600">${esc(i.varLabel||'Seçenek')}: ${esc(i.variant)}</div>`:''}
     ${i.note?`<div style="margin-top:6px;padding:6px 8px;background:#f7f2f0;border-left:3px solid #9a1b1f;font-size:11px"><b>Açıklama:</b> ${esc(i.note).replace(/\n/g,'<br>')}</div>`:''}
-    ${p.short?`<div class="p-desc">${esc(p.short)}</div>`:''}
-    ${p.feats.length?`<ul class="p-feat">${p.feats.slice(0,showDrw?5:8).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`:''}
+    ${(i.short??p.short)?`<div class="p-desc">${esc(i.short??p.short).replace(/\n/g,'<br>')}</div>`:''}
+    ${(i.feats||p.feats).length?`<ul class="p-feat">${(i.feats||p.feats).slice(0,showDrw?5:8).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`:''}
     ${Q.opts.unitp?`<div class="p-qp"><div>Miktar<b>${qtyTxt(i)}</b></div><div>Birim fiyat (${modeLbl(i)})<b>${fmt(unitShow(i),i.cur)}</b></div>${Number(i.disc)?`<div>İskonto<b>%${Number(i.disc)}</b></div>`:''}</div>`:''}
    </div></div>
   ${specs.length?`<div><div class="p-h">Teknik özellikler</div><div class="p-specs"><div>${col(specs.slice(0,half))}</div><div>${col(specs.slice(half))}</div></div></div>`:''}

@@ -23,6 +23,7 @@ Ana dalda (`main`) yapılan her değişiklik GitHub Pages ile birkaç dakikada c
 - WhatsApp gönder: PDF hazırlanır, telefonda wa.me / Web Share (dosya); bilgisayarda (Mac/Windows) `whatsapp://send` ile masaüstü uygulaması, açılmazsa `web.whatsapp.com/send` (mesaj panoya da kopyalanır).
 - Teklif koşullarında `terms.extra` ("Ek not", serbest metin) — Teklif notu ile Not arasında; boşsa PDF'te görünmez.
 - Teklifte her kalemin para birimi değiştirilebilir (katalog ürünü dahil): fiyatı teklifin kuruyla çevir / rakam aynı kalsın (`itemCur`); seçenek değişince fiyat kalemin para birimine çevrilir.
+- Teklifte katalog kaleminde "✎ Ürün metnini düzenle": `i.short`, `i.feats`, `i.specs` (yalnız bu teklif; PDF ürün sayfası, mermer kartı ve kalem özeti bunları kullanır; `pspecs(p,v,it)` `it.specs` varsa onu döndürür). "Katalogdaki metne dön" siler.
 - Teklif kalemleri ⠿ tutamağıyla sürüklenerek (fare/dokunmatik) ya da ↑/↓ ile sıralanır; PDF sırası `Q.items` sırasıdır.
 - Ürünler listesinde her ürünün fiyatının üstünde para birimi seçimi (tek ürün; kura göre çevir / rakamlar aynı). Ürünler › "Para birimini değiştir": o an listelenen ürünlere (kategori/alt grup/arama) toplu `overrides` yazar: `cur` + kura göre çevrilmiş `price`/`vprices` (KDV dahil/hariç ayarı hesaba katılır, yuvarlama seçilir) ya da yalnız `cur`.
 - `custom/<kod>` programdan eklenen ürünler · `counter/quotes` sıradaki numara · `counter/rate` {eur, usd, date}
