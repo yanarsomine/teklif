@@ -952,7 +952,7 @@ table.list th,.list th{font-size:11px;letter-spacing:.06em;text-transform:upperc
         <div class="fields">
           <div class="f"><label for="t-pay">Ödeme şekli</label><input id="t-pay"></div>
           <div class="f"><label for="t-del">Teslim süresi</label><input id="t-del"></div>
-          <div class="f"><label for="t-ins">Montaj</label><input id="t-ins"></div>
+          <div class="f"><label for="t-ins">Montaj</label><div class="seg" id="t-ins-seg" role="radiogroup" aria-label="Montaj" style="margin-bottom:6px"><button type="button" role="radio" data-ins="Montaj fiyata dahildir">Dahil</button><button type="button" role="radio" data-ins="Montaj fiyata dahil değildir">Dahil değil</button></div><input id="t-ins"></div>
           <div class="f"><label for="t-war">Garanti</label><input id="t-war"></div>
           <div class="f w2"><label>Teklif notu <span class="note">(teklife eklemek istediklerinizi işaretleyin)</span></label><div id="t-xn" class="xn"></div></div>
           <div class="f w2"><label for="t-extra">Ek not <span class="note">(bu teklife özel, istediğinizi yazın — boş bırakılırsa teklifte görünmez)</span></label><textarea id="t-extra" rows="3"></textarea></div>
@@ -1312,10 +1312,13 @@ const OLDNOTE=/Yazılı sipariş teyidinizi bekler,? çalışmalarınızda başa
 const XNFIX={'Alçı, sıva ve boya işleri fiyata dahil değildir.':'Alçı, sıva ve boya işleri firmamıza ait değildir.','Çatı bacası çevresindeki su yalıtımı fiyata dahil değildir.':'Çatı bacası çevresindeki su yalıtımı firmamıza ait değildir.'};
 function fixNote(){if(!Q?.terms)return;if(OLDNOTE.test(Q.terms.notes||''))Q.terms.notes=Q.terms.notes.replace(OLDNOTE,DEFAULT_SETTINGS.notes);
   if(Q.terms.xn)Q.terms.xn=[...new Set(Q.terms.xn.map(x=>XNFIX[x]||x))]}
+/* Montaj seçimi: metin "dahil değil" içeriyorsa ikinci, "dahil" içeriyorsa birinci düğme seçili görünür */
+function insSeg(){const t=(Q.terms.ins||'').toLocaleLowerCase('tr');const v=/dahil değil|hariç/.test(t)?1:/dahil/.test(t)?0:-1;$$('#t-ins-seg [data-ins]').forEach((b,i)=>b.setAttribute('aria-checked',String(i===v)))}
 function bindQuoteFields(){fixNote();renderXn();fillBy();if(!$('#pn-pkg').hidden)renderPkg();else{const k=Q.pkg;$('#pkgbadge').textContent=k&&k.on?`· ${Number(k.net)?fmt(Number(k.net),k.cur):'fiyat yok'}`:''}
   const map={'c-name':['customer','name'],'c-contact':['customer','contact'],'c-phone':['customer','phone'],'c-email':['customer','email'],'c-project':['customer','project'],
    't-pay':['terms','pay'],'t-del':['terms','del'],'t-ins':['terms','ins'],'t-war':['terms','war'],'t-notes':['terms','notes'],'t-extra':['terms','extra']};
-  Object.entries(map).forEach(([id,[a,b]])=>{const el=$('#'+id);el.value=Q[a][b]||'';el.oninput=()=>{Q[a][b]=el.value;saveDraft();suggest(id)}});
+  Object.entries(map).forEach(([id,[a,b]])=>{const el=$('#'+id);el.value=Q[a][b]||'';el.oninput=()=>{Q[a][b]=el.value;saveDraft();suggest(id);if(id==='t-ins')insSeg()}});
+  insSeg();$$('#t-ins-seg [data-ins]').forEach(bt=>bt.onclick=()=>{Q.terms.ins=bt.dataset.ins;$('#t-ins').value=bt.dataset.ins;saveDraft();insSeg()});
   $('#q-date').value=Q.date;$('#q-date').oninput=e=>{Q.date=e.target.value;saveDraft()};
   $('#q-rate').value=Q.rate||'';$('#q-usd').value=Q.usd||'';
   $('#q-rate').oninput=e=>{Q.rate=e.target.value;Q.rateManual=true;Q.rateDate=today();saveDraft();rateNote();renderTotals()};
