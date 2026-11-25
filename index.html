@@ -3778,11 +3778,14 @@ if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventLis
     if(t.tagName!=='INPUT')return false;const ty=(t.getAttribute('type')||'text').toLowerCase();if(BADT.test(ty))return false;
     if(NO.has(t.id)||t.hasAttribute('data-nocap')||t.closest('[data-nocap]'))return false;
     const ac=(t.getAttribute('autocomplete')||'')+' '+(t.name||'')+' '+(t.id||'');if(/mail|password|user|tel|phone|iban|web|url|link|konum/i.test(ac))return false;return true};
+  const SMALL=/^(ve|ile|veya|ya|da|de|ki|ama|fakat|ancak|için|gibi|kadar|göre|ise|yani|hem|ne|mi|mı|mu|mü|bir)$/;
   const UNITS=/^(mm|cm|m|mt|m²|m2|m³|m3|km|kg|gr|g|ton|lt|l|kw|kwh|w|adet|ad|derece|sn|dk|saat|gün|ay|yıl)$/;
   const cap=v=>v.replace(/(^|[\s\-(])(\p{Ll})/gu,(m,a,b,off,str)=>{const w=(str.slice(off+a.length).match(/^[\p{L}²³0-9]+/u)||[''])[0];
     return /\d\s?$/.test(str.slice(Math.max(0,off-3),off+a.length))&&UNITS.test(w)?m:a+b.toLocaleUpperCase('tr-TR')});
+  const lowSmall=v=>v.replace(/(^|[\s\-(])([\p{L}]+)(?=$|[^\p{L}])/gu,(m,a,w,off,str)=>{const lw=w.toLocaleLowerCase('tr-TR');if(lw===w||!SMALL.test(lw))return m;
+    const before=str.slice(0,off+a.length);if(!before.trim()||/[.!?:\n]\s*$/.test(before))return m;return a+lw});
   document.addEventListener('input',e=>{const t=e.target;if(e.isComposing||!ok(t))return;
-    const v=t.value,n=cap(v);if(n===v)return;const s=t.selectionStart,en=t.selectionEnd;t.value=n;try{t.setSelectionRange(s,en)}catch(_){}},true);
+    const v=t.value,n=lowSmall(cap(v));if(n===v)return;const s=t.selectionStart,en=t.selectionEnd;t.value=n;try{t.setSelectionRange(s,en)}catch(_){}},true);
 })();
 </script>
 </body>
