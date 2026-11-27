@@ -945,6 +945,14 @@ table.list th,.list th{font-size:11px;letter-spacing:.06em;text-transform:upperc
       </div>
       <div class="sec">
         <h3>Toplamlar</h3>
+        <div id="lump" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:8px;display:grid;gap:8px">
+          <label class="chk"><input type="checkbox" id="lp-on"> <b>Toplam fiyatı kendim yazacağım</b> <span class="note">– kalemlerin fiyatı teklifte görünmez</span></label>
+          <div class="fields" id="lp-f" hidden>
+            <div class="f"><label for="lp-amt">Toplam tutar</label><input id="lp-amt" type="number" min="0" step="0.01" inputmode="decimal"></div>
+            <div class="f"><label for="lp-vat">KDV</label><select id="lp-vat"><option value="incl">KDV dahil</option><option value="excl">KDV hariç</option></select></div>
+            <div class="f"><label for="lp-cur">Para birimi</label><select id="lp-cur"><option value="TRY">Türk Lirası</option><option value="EUR">Euro</option><option value="USD">Amerikan Doları</option></select></div>
+          </div>
+        </div>
         <div id="tots" class="tot"></div>
       </div>
       <div class="sec">
@@ -1163,9 +1171,10 @@ const MONCAT='Baca ve Montaj Ekipmanları';
 /* Montaj malzemesi: eski 'Baca ve Montaj Ekipmanları' kategorisi ya da mon:true (artık 'Baca ve Isı Odası Uygulamaları' altında) */
 const isMon=p=>!!p&&(p.cat===MONCAT||p.mon===true);
 const PKGIMGS=[{src:'img/montaj/duz-camli.jpg',label:'Düz camlı hazne – ısı odası kesiti'},{src:'img/montaj/kose-camli.jpg',label:'Köşe camlı hazne – ısı odası kesiti'},{src:'img/montaj/kose-camli-bitmis.jpg',label:'Köşe camlı hazne – bitmiş ısı odası, alt ve üst menfezli'}];
-const VR=()=>1+VATR()/100, incl=i=>(i?.vat||'excl')==='incl', NOVAT=()=>Q.opts.addVat===false&&!ALL().some(incl);
+const VR=()=>1+VATR()/100, incl=i=>(i?.vat||'excl')==='incl', NOVAT=()=>Q.lump&&Q.lump.on?(Q.lump.vat==='excl'&&Q.opts.addVat===false):(Q.opts.addVat===false&&!ALL().some(incl));
 const showP=(n,i)=>incl(i)?n*VR():n, fromP=(v,i)=>incl(i)?v/VR():v, modeLbl=i=>incl(i)?'KDV dahil':'KDV hariç';
-function totRows(x,c){const d=x.disc>0.004?`<div class="r"><span>Liste toplamı (KDV hariç)</span><span>${fmt(x.gross,c)}</span></div><div class="r"><span>İskonto</span><span>−${fmt(x.disc,c)}</span></div>`:'';
+function totRows(x,c){if(x.lump){const inc=(Q.lump.vat||'incl')==='incl';if(NOVAT()&&!inc)return `<div class="r g"><span>Toplam fiyat (KDV hariç)</span><span>${fmt(x.net,c)}</span></div>`;return `<div class="r"><span>Ara toplam (KDV hariç)</span><span>${fmt(x.net,c)}</span></div><div class="r"><span>KDV %${VATR()}</span><span>${fmt(x.vat,c)}</span></div><div class="r g"><span>Toplam fiyat (KDV dahil)</span><span>${fmt(x.total,c)}</span></div>`}
+  const d=x.disc>0.004?`<div class="r"><span>Liste toplamı (KDV hariç)</span><span>${fmt(x.gross,c)}</span></div><div class="r"><span>İskonto</span><span>−${fmt(x.disc,c)}</span></div>`:'';
   if(NOVAT())return d+`<div class="r g"><span>Toplam (KDV hariç)</span><span>${fmt(x.net,c)}</span></div>`;
   return d+`<div class="r"><span>Ara toplam (KDV hariç)</span><span>${fmt(x.net,c)}</span></div><div class="r"><span>KDV %${VATR()}</span><span>${fmt(x.vat,c)}</span></div><div class="r g"><span>Genel toplam (KDV dahil)</span><span>${fmt(x.total,c)}</span></div>`}
 function bindVat(){$('#addvat-wrap').hidden=ALL().some(incl);$('#o-addvat').checked=Q.opts.addVat!==false}
@@ -1178,12 +1187,22 @@ const PKGDESC='40 mm × 40 mm × 2 mm profil altyapı oluşturma, cam elyaf kar�
 function svcTitle(){if(!Q.pkg?.svc)return PKGTITLE;const sv=(Q.pkg?.svc||[]);if(!sv.length)return 'Paket hizmet';return (sv.length>1?sv.slice(0,-1).join(', ')+' ve '+sv[sv.length-1]:sv[0])+' (paket fiyat)'}
 function ALL(){const p=pkgItem();const it=Q.items.filter(i=>i.code||(i.name||'').trim()||Number(i.net));return p?it.concat([p]):it}
 function lineNet(i){return (Number(i.net)||0)*(Number(i.qty)||0)*(1-(Number(i.disc)||0)/100)}
+/* Toplu fiyat: kalem fiyatları gösterilmez, genel toplamı kullanıcı yazar (Q.lump={on,amt,vat,cur}) */
+const LUMP=()=>!!(Q.lump&&Q.lump.on);
+function lumpTotals(){const L=Q.lump,a=Number(L.amt)||0,c=L.cur||'TRY';const inc=(L.vat||'incl')==='incl';
+  const net=inc?r2(a/VR()):r2(a),total=Q.opts.addVat===false&&!inc?net:(inc?r2(a):r2(a*VR()));return {[c]:{gross:net,disc:0,net,total,vat:r2(total-net),lump:true}}}
+function bindLump(){const L=Q.lump||{};$('#lp-on').checked=!!L.on;$('#lp-f').hidden=!L.on;$('#lp-amt').value=Number(L.amt)?L.amt:'';$('#lp-vat').value=L.vat||'incl';$('#lp-cur').value=L.cur||'TRY';
+  $('#lp-on').onchange=e=>{Q.lump={...(Q.lump||{vat:'incl',cur:'TRY'}),on:e.target.checked};saveDraft();bindLump();renderItems();if(e.target.checked)setTimeout(()=>$('#lp-amt').focus(),50)};
+  $('#lp-amt').oninput=e=>{Q.lump.amt=Number(e.target.value)||0;saveDraft();renderTotals()};
+  $('#lp-vat').onchange=e=>{Q.lump.vat=e.target.value;saveDraft();renderTotals()};
+  $('#lp-cur').onchange=e=>{Q.lump.cur=e.target.value;saveDraft();renderTotals()}}
 function totals(){
+  if(LUMP())return lumpTotals();
   const g={};CURORDER.forEach(c=>{if(ALL().some(i=>i.cur===c))g[c]={gross:0,disc:0,net:0}});ALL().forEach(i=>{const t=g[i.cur]||(g[i.cur]={gross:0,disc:0,net:0});const raw=(Number(i.net)||0)*(Number(i.qty)||0);t.gross+=raw;t.disc+=raw-lineNet(i);t.net+=lineNet(i)});
   Object.values(g).forEach(t=>{const nr=t.net;t.gross=r2(t.gross);t.disc=r2(t.disc);t.net=r2(nr);t.total=NOVAT()?t.net:r2(nr*VR());t.vat=r2(t.total-t.net)});
   return g;
 }
-function ltHTML(i){const n=lineNet(i);return `${!Number(i.net)?'<span class="np">Fiyat girin</span><br>':''}${fmt(showP(n,i),i.cur)}<div class="note" style="font-weight:400">${incl(i)?'KDV hariç '+fmt(n,i.cur):'KDV dahil '+fmt(n*VR(),i.cur)}</div>`}
+function ltHTML(i){if(LUMP())return '<span class="note">Toplu fiyat</span>';const n=lineNet(i);return `${!Number(i.net)?'<span class="np">Fiyat girin</span><br>':''}${fmt(showP(n,i),i.cur)}<div class="note" style="font-weight:400">${incl(i)?'KDV hariç '+fmt(n,i.cur):'KDV dahil '+fmt(n*VR(),i.cur)}</div>`}
 function itemImg(i,thumb){const p=PIDX[i.code];if(i.cimg)return i.cimg;if(i.gimg&&p&&(p.gallery||[]).includes(i.gimg))return i.gimg;if(!p)return '';const v=p.variants?.find(x=>x.v===i.variant);if(v?.img)return v.img;return thumb?thumbOf(p):(p.img||'')}
 async function shrinkImg(file,max=1100,q=0.82){const url=URL.createObjectURL(file);try{const im=await new Promise((r,j)=>{const x=new Image();x.onload=()=>r(x);x.onerror=j;x.src=url});
   const k=Math.min(1,max/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
@@ -1251,7 +1270,7 @@ function renderPkg(){
        <input data-m="qty" type="number" min="0" step="any" value="${esc(m.qty??'')}" placeholder="Miktar" style="width:80px"> <span class="note">${esc(p.unit||'adet')}</span></div>`:''}</div></div>`}).join('')}</div>
    <p class="note" style="margin:10px 0 0">Seçtiğiniz malzemeler teklifte fiyatsız, "Paket fiyata dahil" olarak fotoğraf ve teknik özellikleriyle gösterilir. Fiyat tablosunda tek satır olarak paket fiyatı çıkar.</p>`;
 }
-function renderTotals(){rateNote();bindVat();if($('#bacabadge'))bacaBadge();
+function renderTotals(){rateNote();bindVat();if($('#lp-on')&&$('#lp-on').checked!==LUMP())bindLump();if($('#bacabadge'))bacaBadge();
   const t=totals(), keys=Object.keys(t);
   if(!keys.length){$('#tots').innerHTML='<div class="note">Henüz kalem yok.</div>';return}
   $('#tots').innerHTML=keys.map(c=>{const x=t[c];return `
@@ -1262,7 +1281,7 @@ function renderTotals(){rateNote();bindVat();if($('#bacabadge'))bacaBadge();
 }
 let RATE=null;
 const rateOf=c=>c==='EUR'?Number(Q.rate)||0:c==='USD'?Number(Q.usd)||0:1;
-const fxCurs=()=>['EUR','USD'].filter(c=>ALL().some(i=>i.cur===c));
+const fxCurs=()=>LUMP()?['EUR','USD'].filter(c=>(Q.lump.cur||'TRY')===c):['EUR','USD'].filter(c=>ALL().some(i=>i.cur===c));
 function hasEur(){return fxCurs().length>0}
 const rTxt=r=>String(+Number(r).toFixed(4)).replace('.',',');
 function kurStr(){return fxCurs().map(c=>`1 ${CURS[c]} = ${rateOf(c)?rTxt(rateOf(c)):'—'} ₺`).join(', ')}
@@ -1315,7 +1334,7 @@ function fixNote(){if(!Q?.terms)return;if(OLDNOTE.test(Q.terms.notes||''))Q.term
   if(Q.terms.xn)Q.terms.xn=[...new Set(Q.terms.xn.map(x=>XNFIX[x]||x))]}
 /* Montaj seçimi: metin "dahil değil" içeriyorsa ikinci, "dahil" içeriyorsa birinci düğme seçili görünür */
 function insSeg(){const t=(Q.terms.ins||'').toLocaleLowerCase('tr');const v=/dahil değil|hariç/.test(t)?1:/dahil/.test(t)?0:-1;$$('#t-ins-seg [data-ins]').forEach((b,i)=>b.setAttribute('aria-checked',String(i===v)))}
-function bindQuoteFields(){fixNote();renderXn();fillBy();if(!$('#pn-pkg').hidden)renderPkg();else{const k=Q.pkg;$('#pkgbadge').textContent=k&&k.on?`· ${Number(k.net)?fmt(Number(k.net),k.cur):'fiyat yok'}`:''}
+function bindQuoteFields(){fixNote();renderXn();fillBy();bindLump();if(!$('#pn-pkg').hidden)renderPkg();else{const k=Q.pkg;$('#pkgbadge').textContent=k&&k.on?`· ${Number(k.net)?fmt(Number(k.net),k.cur):'fiyat yok'}`:''}
   const map={'c-name':['customer','name'],'c-contact':['customer','contact'],'c-phone':['customer','phone'],'c-email':['customer','email'],'c-project':['customer','project'],
    't-pay':['terms','pay'],'t-del':['terms','del'],'t-ins':['terms','ins'],'t-war':['terms','war'],'t-notes':['terms','notes'],'t-extra':['terms','extra']};
   Object.entries(map).forEach(([id,[a,b]])=>{const el=$('#'+id);el.value=Q[a][b]||'';el.oninput=()=>{Q[a][b]=el.value;saveDraft();suggest(id);if(id==='t-ins')insSeg()}});
@@ -1507,9 +1526,9 @@ function lineShow(i){return showP(lineNet(i),i)}
 const vtag=i=>`<div class="vt">${incl(i)?'KDV dahil':'+ KDV'}</div>`;
 function rowHTML(i,n){const p=PIDX[i.code];const anyDisc=ALL().some(x=>Number(x.disc)>0);
   return `<tr>${Q.opts.img?`<td class="ph">${itemImg(i)?`<img src="${esc(itemImg(i))}" alt="">`:''}</td>`:''}<td><div class="pn">${n}. ${esc(i.name||p?.name||'—')}</div><div class="ps">${specLine(i)}</div></td>
-   <td class="n">${qtyTxt(i)}</td><td class="n">${fmt(unitShow(i),i.cur)}${vtag(i)}</td>${anyDisc?`<td class="n">${Number(i.disc)?'%'+Number(i.disc):'–'}</td>`:''}<td class="n"><b>${fmt(lineShow(i),i.cur)}</b>${vtag(i)}</td></tr>`}
+   <td class="n">${qtyTxt(i)}</td>${LUMP()?'':`<td class="n">${fmt(unitShow(i),i.cur)}${vtag(i)}</td>${anyDisc?`<td class="n">${Number(i.disc)?'%'+Number(i.disc):'–'}</td>`:''}<td class="n"><b>${fmt(lineShow(i),i.cur)}</b>${vtag(i)}</td>`}</tr>`}
 function theadHTML(){const anyDisc=ALL().some(x=>Number(x.disc)>0);
-  return `<thead><tr>${Q.opts.img?'<th></th>':''}<th>Ürün</th><th class="n">Miktar</th><th class="n">Birim fiyat</th>${anyDisc?'<th class="n">İsk.</th>':''}<th class="n">Tutar</th></tr></thead>`}
+  return `<thead><tr>${Q.opts.img?'<th></th>':''}<th>Ürün</th><th class="n">Miktar</th>${LUMP()?'':`<th class="n">Birim fiyat</th>${anyDisc?'<th class="n">İsk.</th>':''}<th class="n">Tutar</th>`}</tr></thead>`}
 function totalsHTML(){const t=totals();return `<div class="d-tots">${Object.keys(t).map(c=>{const x=t[c];return `<div class="d-tot">
   <div class="r h"><span>${CURN[c]}</span><span></span></div>
   ${totRows(x,c)}
@@ -1540,12 +1559,12 @@ function monCard(i){const p=PIDX[i.code];const img=i.cimg||itemImg(i);
    <div class="m-nm">${esc(i.name||p.name)}</div>${i.note?`<div class="m-v" style="color:#3d3533;font-weight:500">${esc(i.note)}</div>`:''}${i.variant?`<div class="m-v">${esc(i.varLabel||'Seçenek')}: ${esc(i.variant)}</div>`:''}
    ${(()=>{const sh=i.short??p.short;return sh?`<div class="m-ds">${esc(sh.length>170?sh.slice(0,sh.lastIndexOf(' ',165))+'…':sh)}</div>`:''})()}
    ${specs.map(s=>`<div class="r"><span>${esc(s[0])}</span><span>${esc(s[1])}</span></div>`).join('')}
-   ${i.inPkg?`<div class="m-qp"><span>${i.qty?qtyTxt(i):''}</span><b style="color:#9a1b1f">Paket fiyata dahil</b></div>`:Q.opts.unitp?`<div class="m-qp"><span>${qtyTxt(i)}</span><b>${fmt(unitShow(i),i.cur)} / ${esc(i.unit||'adet')}</b></div>`:''}
+   ${i.inPkg?`<div class="m-qp"><span>${i.qty?qtyTxt(i):''}</span><b style="color:#9a1b1f">Paket fiyata dahil</b></div>`:Q.opts.unitp&&!LUMP()?`<div class="m-qp"><span>${qtyTxt(i)}</span><b>${fmt(unitShow(i),i.cur)} / ${esc(i.unit||'adet')}</b></div>`:''}
   </div></div>`}
 function freeDetailHTML(i,no){return `${miniHead(no,'Ürün bilgisi')}
   <div class="p-top" style="grid-template-columns:1fr">${i.cimg?`<div class="p-img" style="height:520px"><img src="${esc(i.cimg)}" alt=""></div>`:''}
    <div><div class="p-name">${esc(i.name||'—')}</div>${i.note||i.desc?`<div class="p-desc" style="font-size:12.5px">${esc(i.note||i.desc).replace(/\n/g,'<br>')}</div>`:''}
-   ${Q.opts.unitp?`<div class="p-qp"><div>Miktar<b>${qtyTxt(i)}</b></div><div>Birim fiyat (${modeLbl(i)})<b>${fmt(unitShow(i),i.cur)}</b></div></div>`:''}</div></div>`}
+   ${Q.opts.unitp&&!LUMP()?`<div class="p-qp"><div>Miktar<b>${qtyTxt(i)}</b></div><div>Birim fiyat (${modeLbl(i)})<b>${fmt(unitShow(i),i.cur)}</b></div></div>`:''}</div></div>`}
 function detailPageHTML(i,no){const p=PIDX[i.code];const img=itemImg(i);
   const specs=pspecs(p,i.variant,i).filter(x=>!['Seri','Model','Model kodu','Stok kodu'].includes(x[0])).slice(0,18);const half=Math.ceil(specs.length/2);
   const col=a=>a.map(s=>`<div class="r"><span>${esc(s[0])}</span><span>${esc(s[1])}</span></div>`).join('');
@@ -1557,7 +1576,7 @@ function detailPageHTML(i,no){const p=PIDX[i.code];const img=itemImg(i);
     ${i.note?`<div style="margin-top:6px;padding:6px 8px;background:#f7f2f0;border-left:3px solid #9a1b1f;font-size:11px"><b>Açıklama:</b> ${esc(i.note).replace(/\n/g,'<br>')}</div>`:''}
     ${(i.short??p.short)?`<div class="p-desc">${esc(i.short??p.short).replace(/\n/g,'<br>')}</div>`:''}
     ${(i.feats||p.feats).length?`<ul class="p-feat">${(i.feats||p.feats).slice(0,showDrw?5:8).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`:''}
-    ${Q.opts.unitp?`<div class="p-qp"><div>Miktar<b>${qtyTxt(i)}</b></div><div>Birim fiyat (${modeLbl(i)})<b>${fmt(unitShow(i),i.cur)}</b></div>${Number(i.disc)?`<div>İskonto<b>%${Number(i.disc)}</b></div>`:''}</div>`:''}
+    ${Q.opts.unitp&&!LUMP()?`<div class="p-qp"><div>Miktar<b>${qtyTxt(i)}</b></div><div>Birim fiyat (${modeLbl(i)})<b>${fmt(unitShow(i),i.cur)}</b></div>${Number(i.disc)?`<div>İskonto<b>%${Number(i.disc)}</b></div>`:''}</div>`:''}
    </div></div>
   ${specs.length?`<div><div class="p-h">Teknik özellikler</div><div class="p-specs"><div>${col(specs.slice(0,half))}</div><div>${col(specs.slice(half))}</div></div></div>`:''}
   ${showDrw?`<div class="p-drw"><div class="p-h">Teknik çizim</div><div class="box"><img src="${esc(p.drw)}" alt=""></div></div>`:''}`;
@@ -1616,9 +1635,10 @@ async function buildPages(){
   try{await withTimeout(document.fonts.ready,4000,'Yazı tipleri')}catch(e){}
   return {pages,no};
 }
-function missingPrices(){return ALL().filter(i=>!Number(i.net)).length}
+function missingPrices(){return LUMP()?(Number(Q.lump.amt)>0?0:1):ALL().filter(i=>!Number(i.net)).length}
 /* Fiyatı girilmemiş kalem varsa önizleme / kaydetme / PDF'e geçmeden uyar */
 function priceGate(what){
+  if(LUMP()){if(Number(Q.lump.amt)>0)return true;toast('Toplam tutarı yazın (Toplamlar bölümü)',3500);$('#lp-amt')?.focus();return false}
   const miss=ALL().filter(i=>!Number(i.net));if(!miss.length)return true;
   document.querySelectorAll('.modal.pg').forEach(x=>x.remove());
   const m=document.createElement('div');m.className='modal pg';
