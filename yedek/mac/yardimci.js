@@ -8,6 +8,7 @@ function temiz(s) { return String(s || '').replace(/[\\\/:*?"<>|]/g, '').replace
 const DURUM = { yeni: 'Yeni talep', plan: 'Keşif planlandı', kesif: 'Keşif yapıldı', teklif: 'Teklif verildi', satis: 'Satış oldu', vazgecti: 'Vazgeçti' };
 function klasor(p) { $.NSFileManager.defaultManager.createDirectoryAtPathWithIntermediateDirectoriesAttributesError(p, true, $(), null); }
 function damga(t) { return t.getFullYear() + iki(t.getMonth() + 1) + iki(t.getDate()) + iki(t.getHours()) + iki(t.getMinutes()) + '.' + iki(t.getSeconds()); }
+const para = (t, pb) => Number(t).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + (pb === 'EUR' ? '€' : pb === 'USD' ? '$' : 'TL');
 function run(a) {
   const mod = a[0];
   if (mod === 'giris') { const pw = $.NSProcessInfo.processInfo.environment.objectForKey('YS_PASS'); return JSON.stringify({ email: a[1], password: pw ? pw.js : '' }); }
@@ -24,12 +25,32 @@ function run(a) {
     yaz(a[2], out.join('\r\n'), true);
     return String(rows.length);
   }
+  if (mod === 'isler') {   // tum-veri.json hedef.csv [kopya.csv] — her iş bir satır: keşif, son teklif, anlaşılan satış tutarı, iskonto
+    const all = JSON.parse(oku(a[1])); const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const qs = all.filter(x => x.collection === 'quotes' && !(x.data && x.data.silindi)), fs = all.filter(x => /^musteriler\/[^/]+\/dosyalar$/.test(x.collection) && !(x.data && x.data.silindi));
+    const TUR = { kesif: 'keşif', teklif: 'teklif', foto: 'fotoğraf', diger: 'diğer' };
+    const out = [['Müşteri', 'Telefon', 'E-posta', 'İl', 'İlçe', 'Adres', 'İş', 'Durum', 'Ürün / kapsam', 'Keşif tarihi', 'Keşif notu', 'Son teklif no', 'Teklif tarihi', 'Teklif tutarı', 'Anlaşılan satış tutarı', 'İskonto', 'İskonto %', 'Satış tarihi', 'Programdaki teklifler', 'Dosyalar', 'İş notları'].map(q).join(';')];
+    all.filter(x => x.collection === 'musteriler' && !(x.data && x.data.silindi)).forEach(c => {
+      const d = c.data || {}; let isler = (Array.isArray(d.isler) ? d.isler : []).filter(j => j && !j.silindi); if (!isler.length) isler = [null];
+      isler.forEach(j => {
+        const o = j ? j.sonTeklif : d.sonTeklif, sv = j && j.durum === 'satis' ? j.satis : null, opb = o ? (o.pb === 'TL' || !o.pb ? 'TRY' : o.pb) : '';
+        let isk = '', iskp = ''; if (o && sv && o.tutar && opb === sv.pb) { const df = Number(o.tutar) - Number(sv.tutar); if (Math.abs(df) > 0.004) { isk = para(df, sv.pb); iskp = '%' + (Math.round(df / Number(o.tutar) * 1000) / 10).toString().replace('.', ','); } }
+        const jqL = qs.filter(x => j ? x.data.jobId === j.id : x.data.customerId === c.id).sort((p, r) => String(r.updated_at || '').localeCompare(String(p.updated_at || ''))); const jq = jqL.map(x => x.data.no).join(', '), jqNo = jqL[0] ? jqL[0].data.no : '';
+        const jf = fs.filter(f => f.collection.split('/')[1] === c.id && (!j || !f.data.isId || f.data.isId === j.id));
+        const cnt = ['kesif', 'teklif', 'foto', 'diger'].map(t => { const n = jf.filter(f => t === 'diger' ? !['kesif', 'teklif', 'foto'].includes(f.data.tur) : f.data.tur === t).length; return n ? n + ' ' + TUR[t] : ''; }).filter(Boolean).join(', ');
+        out.push([d.ad, d.telefon, d.eposta, (j && j.il) || d.il, (j && j.ilce) || d.ilce, (j && j.adres) || d.adres, j ? j.baslik : '', j ? (DURUM[j.durum] || j.durum || '') : '', j ? j.urun : '',
+          j ? j.kesifTarihi : '', j ? j.kesifNotu : '', (o && o.no) || jqNo, o && o.tarih ? String(o.tarih).slice(0, 10) : '', o && o.tutar != null ? para(o.tutar, opb) : '',
+          sv ? para(sv.tutar, sv.pb) : '', isk, iskp, j && j.satisTarihi ? String(j.satisTarihi).slice(0, 10) : '', jq, cnt, j ? j.notlar : d.notlar].map(q).join(';'));
+      });
+    });
+    yaz(a[2], out.join('\r\n'), true); if (a[3]) yaz(a[3], out.join('\r\n'), true);
+    return String(out.length - 1);
+  }
   if (mod === 'birlestir') {   // hedef teklifler.json parça1.json parça2.json …
     let all = []; a.slice(3).forEach(p => { all = all.concat(JSON.parse(oku(p))); });
     yaz(a[1], JSON.stringify(all)); yaz(a[2], JSON.stringify(all.filter(x => x.collection === 'quotes')));
     return String(all.length);
   }
-  const para = (t, pb) => Number(t).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + (pb === 'EUR' ? '€' : pb === 'USD' ? '$' : 'TL');
   if (mod === 'plan') {   // tum-veri.json Müşteriler-klasörü -> "kova|uzak|yerel|epoch|touch" satırları; Müşteri bilgileri.txt dosyalarını yazar
     const all = JSON.parse(oku(a[1])), MUS = a[2], out = [];
     const custs = all.filter(x => x.collection === 'musteriler' && !(x.data && x.data.silindi));

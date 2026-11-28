@@ -48,6 +48,7 @@ SAYI="$(js birlestir "$VERI/tum-veri-$BUGUN.json" "$TMP/teklifler.json" "$TMP"/p
 [ "$TOPLAM" -lt 0 ] || [ "$SAYI" -eq "$TOPLAM" ] || hata "Kayıtlar eksik indi ($SAYI / $TOPLAM)."
 ADET="$(js csv "$TMP/teklifler.json" "$VERI/teklif-listesi-$BUGUN.csv")"
 MUSTERI="$(js musteri "$VERI/tum-veri-$BUGUN.json")"
+mkdir -p "$HEDEF/Müşteriler"; js isler "$VERI/tum-veri-$BUGUN.json" "$VERI/musteri-ve-isler-$BUGUN.csv" "$HEDEF/Müşteriler/Müşteri ve iş listesi.csv" >/dev/null || true
 
 # 3) Müşteri klasörleri: Yedekler/Müşteriler/<Müşteri adı>/ Teklifler · Resimler · Belgeler · Keşif + Müşteri bilgileri.txt
 #    (yalnız yeni/değişen dosyalar iner; çöp kutusundakiler alınmaz)

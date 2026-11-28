@@ -107,6 +107,38 @@ try {
   $csv = ($liste | ConvertTo-Csv -NoTypeInformation -Delimiter ';') -join "`r`n"
   [IO.File]::WriteAllText((Join-Path $VeriD "teklif-listesi-$Bugun.csv"), $csv, (New-Object Text.UTF8Encoding $true))
 
+  # Müşteri ve işler listesi (Excel): her iş bir satır — keşif, son teklif, anlaşılan satış tutarı, iskonto
+  $mlist = @(); $qAll = @($rows | Where-Object { -not $_.data.silindi }); $fAll = @($tum | Where-Object { $_.collection -like 'musteriler/*/dosyalar' -and -not $_.data.silindi })
+  foreach ($c in @($tum | Where-Object { $_.collection -eq 'musteriler' -and -not $_.data.silindi })) {
+    $d = $c.data; $isler = @(@($d.isler) | Where-Object { $_ -and -not $_.silindi }); if (-not $isler.Count) { $isler = @($null) }
+    foreach ($j in $isler) {
+      $o = if ($j) { $j.sonTeklif } else { $d.sonTeklif }; $sv = if ($j -and [string]$j.durum -eq 'satis') { $j.satis } else { $null }
+      $opb = if ($o) { if ($o.pb -eq 'TL' -or -not $o.pb) { 'TRY' } else { [string]$o.pb } } else { '' }
+      $isk = ''; $iskp = ''
+      if ($o -and $sv -and $o.tutar -and $opb -eq [string]$sv.pb) { $df = [double]$o.tutar - [double]$sv.tutar; if ([Math]::Abs($df) -gt 0.004) { $isk = Para $df $sv.pb; $iskp = '%' + ([Math]::Round($df / [double]$o.tutar * 100, 1)).ToString([Globalization.CultureInfo]'tr-TR') } }
+      $jq = if ($j) { @($qAll | Where-Object { $_.data.jobId -eq $j.id }) } else { @($qAll | Where-Object { $_.data.customerId -eq $c.id }) }
+      $jf = @($fAll | Where-Object { ($_.collection -split '/')[1] -eq $c.id -and ((-not $j) -or (-not $_.data.isId) -or $_.data.isId -eq $j.id) })
+      $mlist += [pscustomobject]@{
+        'Müşteri' = $d.ad; 'Telefon' = $d.telefon; 'E-posta' = $d.eposta
+        'İl' = $(if ($j -and $j.il) { $j.il } else { $d.il }); 'İlçe' = $(if ($j -and $j.ilce) { $j.ilce } else { $d.ilce }); 'Adres' = $(if ($j -and $j.adres) { $j.adres } else { $d.adres })
+        'İş' = $(if ($j) { $j.baslik } else { '' }); 'Durum' = $(if ($j) { if ($DURUM[[string]$j.durum]) { $DURUM[[string]$j.durum] } else { $j.durum } } else { '' })
+        'Ürün / kapsam' = $(if ($j) { $j.urun } else { '' })
+        'Keşif tarihi' = $(if ($j) { $j.kesifTarihi } else { '' }); 'Keşif notu' = $(if ($j) { $j.kesifNotu } else { '' })
+        'Son teklif no' = $(if ($o -and $o.no) { $o.no } elseif ($jq.Count) { ($jq | Sort-Object { [string]$_.updated_at } -Descending | Select-Object -First 1).data.no } else { '' }); 'Teklif tarihi' = $(if ($o -and $o.tarih) { ([string]$o.tarih).Substring(0, [Math]::Min(10, ([string]$o.tarih).Length)) } else { '' })
+        'Teklif tutarı' = $(if ($o -and $null -ne $o.tutar) { Para $o.tutar $opb } else { '' })
+        'Anlaşılan satış tutarı' = $(if ($sv) { Para $sv.tutar $sv.pb } else { '' }); 'İskonto' = $isk; 'İskonto %' = $iskp
+        'Satış tarihi' = $(if ($j -and $j.satisTarihi) { ([string]$j.satisTarihi).Substring(0, 10) } else { '' })
+        'Programdaki teklifler' = (($jq | ForEach-Object { $_.data.no }) -join ', ')
+        'Dosyalar' = $(if ($jf.Count) { (@('kesif','teklif','foto','diger') | ForEach-Object { $t = $_; $n = @($jf | Where-Object { ([string]$_.data.tur) -eq $t -or ($t -eq 'diger' -and @('kesif','teklif','foto') -notcontains [string]$_.data.tur) }).Count; if ($n) { "$n $(@{kesif='keşif';teklif='teklif';foto='fotoğraf';diger='diğer'}[$t])" } }) -join ', ' } else { '' })
+        'İş notları' = $(if ($j) { $j.notlar } else { $d.notlar })
+      }
+    }
+  }
+  $mcsv = ($mlist | ConvertTo-Csv -NoTypeInformation -Delimiter ';') -join "`r`n"
+  [IO.File]::WriteAllText((Join-Path $VeriD "musteri-ve-isler-$Bugun.csv"), $mcsv, (New-Object Text.UTF8Encoding $true))
+  New-Item -ItemType Directory -Force -Path (Join-Path $Hedef 'Müşteriler') | Out-Null
+  [IO.File]::WriteAllText((Join-Path (Join-Path $Hedef 'Müşteriler') 'Müşteri ve iş listesi.csv'), $mcsv, (New-Object Text.UTF8Encoding $true))
+
   # 3) Müşteri klasörleri: Yedekler\Müşteriler\<Müşteri adı>\ Teklifler · Resimler · Belgeler · Keşif + Müşteri bilgileri.txt
   #    (yalnız yeni/değişen dosyalar iner; çöp kutusundakiler alınmaz)
   $MusD = Join-Path $Hedef 'Müşteriler'

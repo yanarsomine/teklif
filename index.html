@@ -3598,14 +3598,18 @@ async function deleteCustomer(c,btn){
 /* ---------- CSV ---------- */
 async function exportCsv(){
   if(!downloads){ toast("Bu görünümde indirme kullanılamıyor"); return; }
-  const head=["Dosya no","Ad soyad","Firma/proje","Telefon","E-posta","İl","İlçe","Mahalle","Adres","Kaynak","İş","Durum","Ürün/kapsam","Şömine tipi","Hazne tipi","Keşif tarihi","Son teklif","Satış tutarı","İşin konumu"];
+  const head=["Dosya no","Ad soyad","Firma/proje","Telefon","E-posta","İl","İlçe","Mahalle","Adres","Kaynak","İş","Durum","Ürün/kapsam","Şömine tipi","Hazne tipi","Keşif tarihi","Keşif notu","Son teklif no","Teklif tarihi","Teklif tutarı","Anlaşılan satış tutarı","İskonto","Satış tarihi","İşin konumu","İş notları"];
   const q=v=>{ v=v==null?"":String(v); return /[";\n]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; };
   const lines=[head.join(";")];
   for(const c of filtered()){
     const base=[c.kod,c.ad,c.firma,c.telefon,c.eposta,c.il,c.ilce,c.mahalle,c.adres,c.kaynak];
     const jobs=jobsOf(c);
-    if(!jobs.length) lines.push([...base,"","","","","","","","",""].map(q).join(";"));
-    for(const j of jobs) lines.push([...base, j.baslik, ST[j.durum||"yeni"], j.urun, arr(j.somineTipi).join(", "), arr(j.hazneTipi).join(", "), fmtDate(j.kesifTarihi), j.sonTeklif? fmtMoney(j.sonTeklif.tutar,j.sonTeklif.pb):"", j.durum==="satis"&&j.satis? fmtMoney(j.satis.tutar,j.satis.pb):"", (j.il||j.ilce||j.adres)? [j.adres,jobIlce(c,j),jobIl(c,j)].filter(Boolean).join(", ") : ""].map(q).join(";"));
+    if(!jobs.length) lines.push([...base,...Array(16).fill("")].map(q).join(";"));
+    for(const j of jobs) lines.push([...base, j.baslik, ST[j.durum||"yeni"], j.urun, arr(j.somineTipi).join(", "), arr(j.hazneTipi).join(", "), fmtDate(j.kesifTarihi), j.kesifNotu||"", j.sonTeklif?.no||(()=>{try{const L=(typeof QUOTES!=="undefined"?QUOTES:[]).filter(x=>!x.silindi&&(x.id===j.sonTeklif?.qid||x.jobId===j.id)).sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));return L[0]?.no||""}catch(e){return ""}})(), j.sonTeklif?.tarih? fmtDate(j.sonTeklif.tarih):"", j.sonTeklif? fmtMoney(j.sonTeklif.tutar,j.sonTeklif.pb):"",
+      j.durum==="satis"&&j.satis? fmtMoney(j.satis.tutar,j.satis.pb):"",
+      (()=>{const o=j.sonTeklif,sv=j.durum==="satis"&&j.satis;if(!o||!sv||!(Number(o.tutar)>0))return "";const opb=o.pb==="TL"||!o.pb?"TRY":o.pb;if(opb!==sv.pb)return "";const df=Number(o.tutar)-Number(sv.tutar);return Math.abs(df)>0.004? fmtMoney(df,sv.pb)+" (%"+(df/Number(o.tutar)*100).toLocaleString("tr-TR",{maximumFractionDigits:1})+")":""})(),
+      j.durum==="satis"&&j.satisTarihi? fmtDate(j.satisTarihi):"",
+      (j.il||j.ilce||j.adres)? [j.adres,jobIlce(c,j),jobIl(c,j)].filter(Boolean).join(", ") : "", j.notlar||""].map(q).join(";"));
   }
   try{ await downloads.save({filename:"musteriler-"+new Date().toISOString().slice(0,10)+".csv", data:"﻿"+lines.join("\r\n")}); }
   catch(e){ if(e?.code!=="declined") toast("İndirilemedi"); }
