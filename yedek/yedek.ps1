@@ -28,6 +28,7 @@ function Bildir($id, $veri) {
   } catch { }
 }
 function Temiz($s) { (($s -replace '[\\/:*?"<>|]', '') -replace '\s+', ' ').Trim() }
+function Para($t, $pb) { $c = if ($pb -eq 'EUR') { '€' } elseif ($pb -eq 'USD') { '$' } else { 'TL' }; return ([double]$t).ToString('N2', [Globalization.CultureInfo]'tr-TR') + ' ' + $c }
 $DURUM = @{ yeni = 'Yeni talep'; plan = 'Keşif planlandı'; kesif = 'Keşif yapıldı'; teklif = 'Teklif verildi'; satis = 'Satış oldu'; vazgecti = 'Vazgeçti' }
 function Liste($kova, $onek) {
   # Kovadaki tüm dosyalar (alt klasörler dahil), 1000'erli sayfalar
@@ -120,7 +121,17 @@ try {
     $cd = Join-Path $MusD $n; New-Item -ItemType Directory -Force -Path $cd | Out-Null
     $d = $c.data
     $bilgi = @("Müşteri: $($d.ad)", "Telefon: $($d.telefon)", "E-posta: $($d.eposta)", "Adres: $((@($d.adres, $d.ilce, $d.il) | Where-Object { $_ }) -join ', ')", '', 'İşler:')
-    foreach ($j in @($d.isler)) { if ($j -and -not $j.silindi) { $bilgi += "- $($j.baslik)  [$(if ($DURUM[[string]$j.durum]) { $DURUM[[string]$j.durum] } else { $j.durum })]$(if ($j.kesifTarihi) { '  keşif: ' + $j.kesifTarihi })$(if ($j.sonTeklif -and $j.sonTeklif.no) { '  son teklif: ' + $j.sonTeklif.no })" } }
+    foreach ($j in @($d.isler)) { if ($j -and -not $j.silindi) {
+      $sat = ''; $tek = ''
+      if ($j.sonTeklif) { $tek = '  son teklif: ' + $(if ($j.sonTeklif.no) { $j.sonTeklif.no + ' ' } else { '' }) + $(if ($null -ne $j.sonTeklif.tutar) { '(' + (Para $j.sonTeklif.tutar $j.sonTeklif.pb) + ')' } else { '' }) }
+      if ([string]$j.durum -eq 'satis' -and $j.satis) {
+        $sat = '  SATIŞ: ' + (Para $j.satis.tutar $j.satis.pb)
+        $opb = if ($j.sonTeklif) { if ($j.sonTeklif.pb -eq 'TL' -or -not $j.sonTeklif.pb) { 'TRY' } else { [string]$j.sonTeklif.pb } } else { '' }
+        if ($j.sonTeklif -and $j.sonTeklif.tutar -and $opb -eq [string]$j.satis.pb) { $df = [double]$j.sonTeklif.tutar - [double]$j.satis.tutar; if ($df -gt 0.004) { $sat += ' (iskonto ' + (Para $df $j.satis.pb) + ', %' + ([Math]::Round($df / [double]$j.sonTeklif.tutar * 100, 1)).ToString([Globalization.CultureInfo]'tr-TR') + ')' } }
+        if ($j.satisTarihi) { $sat += '  satış tarihi: ' + ([string]$j.satisTarihi).Substring(0, 10) }
+      }
+      $bilgi += "- $($j.baslik)  [$(if ($DURUM[[string]$j.durum]) { $DURUM[[string]$j.durum] } else { $j.durum })]$(if ($j.kesifTarihi) { '  keşif: ' + $j.kesifTarihi })$tek$sat"
+    } }
     if ($d.notlar) { $bilgi += ''; $bilgi += "Notlar: $($d.notlar)" }
     $bilgi += ''; $bilgi += "Yedek tarihi: $(Get-Date -Format 'dd.MM.yyyy HH:mm')"
     [IO.File]::WriteAllText((Join-Path $cd 'Müşteri bilgileri.txt'), ($bilgi -join "`r`n"), (New-Object Text.UTF8Encoding $true))

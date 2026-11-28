@@ -29,6 +29,7 @@ function run(a) {
     yaz(a[1], JSON.stringify(all)); yaz(a[2], JSON.stringify(all.filter(x => x.collection === 'quotes')));
     return String(all.length);
   }
+  const para = (t, pb) => Number(t).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + (pb === 'EUR' ? '€' : pb === 'USD' ? '$' : 'TL');
   if (mod === 'plan') {   // tum-veri.json Müşteriler-klasörü -> "kova|uzak|yerel|epoch|touch" satırları; Müşteri bilgileri.txt dosyalarını yazar
     const all = JSON.parse(oku(a[1])), MUS = a[2], out = [];
     const custs = all.filter(x => x.collection === 'musteriler' && !(x.data && x.data.silindi));
@@ -41,7 +42,11 @@ function run(a) {
       const b = ['Müşteri: ' + (d.ad || ''), 'Telefon: ' + (d.telefon || ''), 'E-posta: ' + (d.eposta || ''),
         'Adres: ' + [d.adres, d.ilce, d.il].filter(Boolean).join(', '), '', 'İşler:'];
       (Array.isArray(d.isler) ? d.isler : []).filter(j => j && !j.silindi).forEach(j => b.push('- ' + (j.baslik || 'İş') + '  [' + (DURUM[j.durum] || j.durum || '') + ']' +
-        (j.kesifTarihi ? '  keşif: ' + j.kesifTarihi : '') + (j.sonTeklif && j.sonTeklif.no ? '  son teklif: ' + j.sonTeklif.no : '')));
+        (j.kesifTarihi ? '  keşif: ' + j.kesifTarihi : '') +
+        (j.sonTeklif ? '  son teklif: ' + (j.sonTeklif.no ? j.sonTeklif.no + ' ' : '') + (j.sonTeklif.tutar != null ? '(' + para(j.sonTeklif.tutar, j.sonTeklif.pb) + ')' : '') : '') +
+        (j.durum === 'satis' && j.satis ? (() => { let t = '  SATIŞ: ' + para(j.satis.tutar, j.satis.pb); const o = j.sonTeklif, opb = o ? (o.pb === 'TL' || !o.pb ? 'TRY' : o.pb) : '';
+          if (o && o.tutar && opb === j.satis.pb) { const df = Number(o.tutar) - Number(j.satis.tutar); if (df > 0.004) t += ' (iskonto ' + para(df, j.satis.pb) + ', %' + (Math.round(df / Number(o.tutar) * 1000) / 10).toString().replace('.', ',') + ')'; }
+          if (j.satisTarihi) t += '  satış tarihi: ' + String(j.satisTarihi).slice(0, 10); return t; })() : '')));
       if (d.notlar) b.push('', 'Notlar: ' + d.notlar);
       const z = new Date(); b.push('', 'Yedek tarihi: ' + iki(z.getDate()) + '.' + iki(z.getMonth() + 1) + '.' + z.getFullYear() + ' ' + iki(z.getHours()) + ':' + iki(z.getMinutes()));
       yaz(cd + '/Müşteri bilgileri.txt', b.join('\n'), true);
