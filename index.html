@@ -182,6 +182,10 @@ table.d-t tr.cur td{background:#f7f2f0;font-weight:700;font-size:10px;letter-spa
 .d-tl .lb{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#e7b9ba;font-weight:700;margin-bottom:2px}
 .d-tl .sm{font-size:10px;color:#cfc4c1}
 .d-tl .v{font:700 22px/1.1 var(--f-ui);text-align:right;white-space:nowrap}
+.d-tlg{display:block;padding:12px 16px 10px}.d-tlg .hd{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:6px}
+.d-tlg .tr{display:flex;justify-content:space-between;gap:16px;font-size:11.5px;padding:3px 0}.d-tlg .tr>span:last-child{white-space:nowrap;font-weight:600}
+.d-tlg .tr.sub{border-top:1px solid #5a4e4c;margin-top:3px;padding-top:6px;font-weight:700}
+.d-tlg .tr.tot{border-top:1px solid #5a4e4c;margin-top:4px;padding-top:7px;font:700 17px/1.2 var(--f-ui)}
 .d-fx{border-left:3px solid #9a1b1f;background:#f7f2f0;padding:8px 12px;font-size:10.8px;color:#3d3533}
 
 .l-letter{font:12.5px/1.65 var(--f-doc);color:#2a2322;padding:4px 2px}
@@ -1300,22 +1304,24 @@ function rateNote(){const el=$('#q-ratenote');if(!el)return;
   el.innerHTML=(miss.length?`<span class="np">${miss.map(c=>CURN[c]).join(' ve ')} kuru eksik.</span> `:'')+t;
   const u=$('#userate');if(u)u.onclick=e=>{e.preventDefault();applyRate(true)}}
 function tlCalc(){const t=totals();const fx=fxCurs();if(!fx.length||fx.some(c=>!rateOf(c)))return null;
-  const parts=CURORDER.filter(c=>t[c]).map(c=>({c,r:rateOf(c),tl:t[c].total*rateOf(c)}));
+  const parts=CURORDER.filter(c=>t[c]).map(c=>({c,r:rateOf(c),tl:t[c].total*rateOf(c),net:t[c].net,tlNet:t[c].net*rateOf(c)}));
   const sum=k=>CURORDER.filter(c=>t[c]).reduce((a,c)=>a+t[c][k]*rateOf(c),0);
   return {parts,net:sum('net'),vat:sum('vat'),total:sum('total')}}
 const partLbl=p=>p.c==='TRY'?'TL tutarlar':`${CURN[p.c]} tutarların TL karşılığı`;
-function tlPanel(){const x=tlCalc();if(!x)return '';const kl=NOVAT()?'KDV hariç':'KDV dahil';
+function tlPanel(){const x=tlCalc();if(!x)return '';
+  const pl=p=>p.c==='TRY'?'TL tutarlar (KDV hariç)':`${CURN[p.c]} tutarlar (KDV hariç) · ${fmt(p.net,p.c)} × ${rTxt(p.r)}`;
   return `<div style="border:2px solid var(--brand);border-radius:8px;padding:8px 10px;display:grid;gap:3px">
    <div class="note" style="font-weight:700;color:var(--brand)">Genel toplam – Türk Lirası (${kurStr()})</div>
-   ${x.parts.map(p=>`<div class="r"><span>${partLbl(p)} (${kl})</span><span>${fmt(p.tl,'TRY')}</span></div>`).join('')}
-   ${NOVAT()?'':`<div class="r"><span>Ara toplam (KDV hariç)</span><span>${fmt(x.net,'TRY')}</span></div>
-   <div class="r"><span>KDV %${VATR()}</span><span>${fmt(x.vat,'TRY')}</span></div>`}
-   <div class="r g"><span>Toplam (TL, ${kl})</span><span>${fmt(x.total,'TRY')}</span></div></div>`}
+   ${x.parts.map(p=>`<div class="r"><span>${pl(p)}</span><span>${fmt(p.tlNet,'TRY')}</span></div>`).join('')}
+   ${NOVAT()?`<div class="r g"><span>Toplam (TL, KDV hariç)</span><span>${fmt(x.net,'TRY')}</span></div>`:`<div class="r" style="border-top:1px solid var(--line);padding-top:3px"><span><b>Ara toplam (KDV hariç)</b></span><span><b>${fmt(x.net,'TRY')}</b></span></div>
+   <div class="r"><span>KDV %${VATR()}</span><span>${fmt(x.vat,'TRY')}</span></div>
+   <div class="r g"><span>Genel toplam (TL, KDV dahil)</span><span>${fmt(x.total,'TRY')}</span></div>`}</div>`}
 function tlDoc(){const x=tlCalc();if(!x)return '';
-  return `<div class="d-tl"><div class="l"><div class="lb">Genel toplam · Türk Lirası</div><div>${kurStr()} (${trDate(Q.rateDate||Q.date)})</div>
-    <div class="sm">${x.parts.map(p=>`${p.c==='TRY'?'TL tutarlar':CURN[p.c]+' tutarlar'}: ${fmt(p.tl,'TRY')}`).join(' · ')}</div>
-    ${NOVAT()?'':`<div class="sm">Ara toplam (KDV hariç): ${fmt(x.net,'TRY')} · KDV %${VATR()}: ${fmt(x.vat,'TRY')}</div>`}</div>
-   <div class="v">${fmt(x.total,'TRY')}<div class="sm">${NOVAT()?'KDV hariç':'KDV dahil'}</div></div></div>`}
+  const pl=p=>p.c==='TRY'?'TL tutarlar':`${CURN[p.c]} tutarlar <span class="sm">(${fmt(p.net,p.c)} × ${rTxt(p.r)})</span>`;
+  const row=(a,b,c='')=>`<div class="tr ${c}"><span>${a}</span><span>${b}</span></div>`;
+  return `<div class="d-tl d-tlg"><div class="hd"><div class="lb">Genel toplam · Türk Lirası</div><div class="sm">${kurStr()} (${trDate(Q.rateDate||Q.date)})</div></div>
+    ${x.parts.map(p=>row(pl(p)+' <span class="sm">KDV hariç</span>',fmt(p.tlNet,'TRY'))).join('')}
+    ${NOVAT()?row('Toplam (KDV hariç)',fmt(x.net,'TRY'),'tot'):row('Ara toplam (KDV hariç)',fmt(x.net,'TRY'),'sub')+row('KDV %'+VATR(),fmt(x.vat,'TRY'))+row('Genel toplam (KDV dahil)',fmt(x.total,'TRY'),'tot')}</div>`}
 function fxNote(){if(!hasEur())return '';
   const txt=String(S.fxnote||DEFAULT_SETTINGS.fxnote).replace('Euro fiyatların','Döviz fiyatların').replace('1 € = {kur} ₺','{kur}').replace('{kur}',kurStr()).replace('{tarih}',trDate(Q.rateDate||Q.date));
   return `<div class="d-fx">${esc(txt)}</div>`}
