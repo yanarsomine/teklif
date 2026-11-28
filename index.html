@@ -2328,14 +2328,14 @@ function renderDash(){
   const td=today();
   const kes=rows.filter(r=>r.j.kesifTarihi&&r.j.kesifTarihi>=td&&['yeni','plan'].includes(r.j.durum||'yeni')).sort((a,b)=>a.j.kesifTarihi.localeCompare(b.j.kesifTarihi));
   const bek=by('teklif').sort((a,b)=>((a.j.sonTeklif?.tarih)||a.j.guncelleme||'').localeCompare((b.j.sonTeklif?.tarih)||b.j.guncelleme||''));
-  const sumTxt=list=>{const s={};list.forEach(r=>{const o=r.j.sonTeklif;if(o&&o.tutar!=null){const k=o.pb==='TL'?'TRY':(o.pb||'TRY');s[k]=(s[k]||0)+Number(o.tutar)}});return Object.entries(s).map(([c,v])=>fmt(v,c)).join(' + ')};
+  const sumTxt=(list,sale)=>{const s={};list.forEach(r=>{const o=sale?(r.j.satis||r.j.sonTeklif):r.j.sonTeklif;if(o&&o.tutar!=null){const k=o.pb==='TL'?'TRY':(o.pb||'TRY');s[k]=(s[k]||0)+Number(o.tutar)}});return Object.entries(s).map(([c,v])=>fmt(v,c)).join(' + ')};
   const ym=td.slice(0,7);const sat=by('satis').filter(r=>(r.j.satisTarihi||r.j.guncelleme||'').slice(0,7)===ym);
   const load=!DBREADY;
   $('#kpis').innerHTML=[
     ['Açık işler',load?'…':open.length,cs.length?`${cs.length} müşteri dosyası`:'Henüz müşteri yok','',''],
     ['Yanıt bekleyen teklif',load?'…':bek.length,sumTxt(bek)||'Bekleyen teklif yok','teklif',bek.length?'hot':''],
     ['Yaklaşan keşif',load?'…':kes.length,kes[0]?`İlki ${trDate(kes[0].j.kesifTarihi)} · ${kes[0].c.ad||''}`:'Planlı keşif yok','@kesif',''],
-    ['Bu ay satış',load?'…':sat.length,sumTxt(sat)||'Bu ay kapanan iş yok','satis','']
+    ['Bu ay satış',load?'…':sat.length,sumTxt(sat,true)||'Bu ay kapanan iş yok','satis','']
   ].map(([k,v,d,st,cls])=>`<button class="kpi ${cls}" type="button" data-st="${st}"><span class="k">${k}</span><span class="v">${v}</span><span class="d">${esc(d)}</span></button>`).join('');
   $('#pipe').innerHTML=QST.map(([k,t])=>`<button class="pstep p-${k}" type="button" data-st="${k}"><b>${load?'…':by(k).length}</b><span>${t}</span></button>`).join('');
   const li=(r,rt,sub,cls)=>`<button class="dli" type="button" data-cust="${esc(r.c.id)}" data-job="${esc(r.j.id)}"><b>${esc(r.c.ad||'(isimsiz)')}</b><span class="rt ${cls||''}">${rt}</span><small>${esc(sub)}</small></button>`;
@@ -2369,7 +2369,7 @@ function renderOzet(){
     const rv=o.reduce((a,x)=>a+x.revs,0);const [y,m]=ym.split('-');
     return `<tr class="${ym===cur?'cur':''}"><td>${AYLAR[+m-1]} ${y}${ym===cur?'<small>bu ay</small>':''}</td>
       <td>${o.length}${rv?`<small>+${rv} revizyon</small>`:''}<small class="mob">${sumCur(o.map(x=>x.amt))}</small></td><td class="dsk">${sumCur(o.map(x=>x.amt))||'—'}</td>
-      <td>${sj.length}<small class="mob">${sumCur(sj.map(j=>j.sonTeklif))}</small></td><td class="dsk">${sumCur(sj.map(j=>j.sonTeklif))||'—'}</td>
+      <td>${sj.length}<small class="mob">${sumCur(sj.map(j=>j.satis||j.sonTeklif))}</small></td><td class="dsk">${sumCur(sj.map(j=>j.satis||j.sonTeklif))||'—'}${(()=>{const d=sj.filter(j=>j.satis&&j.sonTeklif&&Number(j.sonTeklif.tutar)>Number(j.satis.tutar)&&(j.satis.pb||'TRY')===((j.sonTeklif.pb==='TL'?'TRY':j.sonTeklif.pb)||'TRY'));return d.length?`<small>iskonto ${sumCur(d.map(j=>({tutar:Number(j.sonTeklif.tutar)-Number(j.satis.tutar),pb:j.satis.pb})))}</small>`:''})()}</td>
       <td>${o.length?Math.round(sj.length/o.length*100)+'%':'—'}</td></tr>`}).join('');
   // ürünler: son 3 ay teklif edilen / satışa dönen
   const m3=months[2];const cnt={},sc={};
@@ -2381,7 +2381,7 @@ function renderOzet(){
   el.innerHTML=`<div class="ozw"><table class="oz"><thead><tr><th>Ay</th><th>Teklif</th><th class="dsk">Teklif tutarı</th><th>Satış</th><th class="dsk">Satış tutarı</th><th>Dönüşüm</th></tr></thead><tbody>${rows}</tbody></table></div>
    <div class="ozg"><div><h3>En çok teklif edilen ürünler <span class="note">· son 3 ay</span></h3>${top(cnt,'teklif')}</div>
    <div><h3>Satışa dönen ürünler <span class="note">· son 3 ay</span></h3>${top(sc,'satış')}</div></div>
-   <p class="note" style="margin:10px 0 0">Satış, müşteri dosyasında işin "Satış oldu" yapıldığı aya yazılır; tutar o işin son teklifidir. Dönüşüm = o ayki satış ÷ o ayki teklif.</p>`;
+   <p class="note" style="margin:10px 0 0">Satış, müşteri dosyasında işin "Satış oldu" yapıldığı aya yazılır; tutar, satış işaretlenirken girilen anlaşılan satış tutarıdır (girilmediyse son teklif). Dönüşüm = o ayki satış ÷ o ayki teklif.</p>`;
 }
 let BKP=null,BKPERR=null;
 function lastDue(){ // son geçen 18:00 (pazar hariç) + 45 dk tolerans
@@ -2535,7 +2535,7 @@ function locsOf(c){
    (aynı müşteride başka biri başka bir işi değiştirdiyse onun değişikliği kaybolmaz) */
 const jobsRaw = c => Array.isArray(c.isler) ? c.isler : jobsOf(c);
 async function saveJobs(cid, jobs, extra={}){
-  jobs=jobs.map(j=>j.durum==="satis"&&!j.satisTarihi? {...j,satisTarihi:nowISO()} : j.durum!=="satis"&&j.satisTarihi? (({satisTarihi,...r})=>r)(j) : j);
+  jobs=jobs.map(j=>j.durum==="satis"&&!j.satisTarihi? {...j,satisTarihi:nowISO()} : j.durum!=="satis"&&(j.satisTarihi||j.satis)? (({satisTarihi,satis,...r})=>r)(j) : j);
   const before=jobsOf(freshC(cid)||{});
   const bmap=new Map(before.map(j=>[j.id,JSON.stringify(j)]));
   const changed=jobs.filter(j=>bmap.get(j.id)!==JSON.stringify(j));
@@ -2865,6 +2865,25 @@ function customerForm(c,isNew){
   return f;
 }
 
+/* Satış tutarı: teklif sonrası telefonda yapılan iskontoyla anlaşılan son fiyat (j.satis={tutar,pb,tarih}) */
+function askSale(j){return new Promise(res=>{
+  const o=j.sonTeklif||null, opb=o?(o.pb==='TL'?'TRY':(o.pb||'TRY')):'TRY', cur=j.satis||null;
+  const m=document.createElement('div');m.className='modal';
+  m.innerHTML=`<form class="dlg" style="max-width:460px"><h2 style="margin:0;font-size:17px">Satış tutarı · ${esc(j.baslik||'İş')}</h2>
+   <p class="note" style="margin:0">${o?`Son teklif: <b>${esc(fmtMoney(o.tutar,opb))}</b>${o.no?' ('+esc(o.no)+')':''}. `:''}Müşteriyle anlaştığınız son fiyatı yazın (iskonto sonrası). Panel ve aylık özet bu tutarı kullanır.</p>
+   <div class="fields"><div class="f"><label for="sl-t">Anlaşılan satış tutarı</label><input id="sl-t" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(cur?cur.tutar:(o?o.tutar:''))}"></div>
+    <div class="f"><label for="sl-pb">Para birimi</label><select id="sl-pb">${['TRY','EUR','USD'].map(c=>`<option value="${c}" ${(cur?cur.pb:opb)===c?'selected':''}>${{TRY:'Türk Lirası',EUR:'Euro',USD:'Amerikan Doları'}[c]}</option>`).join('')}</select></div></div>
+   <p class="note" id="sl-d" style="margin:0;font-weight:600"></p>
+   <p class="note" style="margin:0">Teklif toplamıyla aynı şekilde yazın (teklif KDV dahilse KDV dahil).</p>
+   <div class="askb"><button class="btn" type="button" id="sl-x">Vazgeç</button><button class="btn pri" type="submit">Kaydet</button></div></form>`;
+  document.body.appendChild(m);
+  const t=m.querySelector('#sl-t'),pb=m.querySelector('#sl-pb'),d=m.querySelector('#sl-d');
+  const upd=()=>{const v=Number(t.value);if(o&&v>0&&pb.value===opb&&Number(o.tutar)>0){const df=Number(o.tutar)-v;d.textContent=df>0.004?`İskonto: ${fmtMoney(df,opb)} (%${(df/Number(o.tutar)*100).toLocaleString('tr-TR',{maximumFractionDigits:1})})`:df<-0.004?`Tekliften ${fmtMoney(-df,opb)} fazla`:'Teklif tutarıyla aynı';}else d.textContent=''};
+  t.oninput=upd;pb.onchange=upd;upd();setTimeout(()=>{t.focus();t.select()},50);
+  const done=v=>{m.remove();res(v)};
+  m.querySelector('#sl-x').onclick=()=>done(null);m.addEventListener('click',e=>{if(e.target===m)done(null)});
+  m.querySelector('form').onsubmit=e=>{e.preventDefault();const v=Number(t.value);if(!(v>0)){t.focus();d.textContent='Satış tutarını yazın.';return}done({tutar:Math.round(v*100)/100,pb:pb.value,tarih:nowISO()})};
+})}
 function jobForm(c, j){
   const isNew=!j;
   j=j||{};
@@ -2896,6 +2915,7 @@ function jobForm(c, j){
     const data={baslik:v("j_baslik"), durum:v("j_durum"), urun:v("j_urun"), somineTipi:pickedOf(f,"j_somine"), hazneTipi:pickedOf(f,"j_hazne"), kesifTarihi:v("j_kesif"),
       il:titleCase(v("j_il")), ilce:titleCase(v("j_ilce")), adres:v("j_adres"), kesifNotu:v("j_kesifnot"), notlar:v("j_not"), guncelleme:nowISO()};
     let id=j.id;
+    if(data.durum==="satis" && (j.durum!=="satis" || !j.satis)){ const sale=await askSale({...j,...data}); if(!sale) return; data.satis=sale; }
     if(isNew){ id=rid(); jobs.push({id, ...data, sonTeklif:null, olusturma:nowISO()}); }
     else { const i=jobs.findIndex(x=>x.id===id); if(i<0){ err.textContent="Bu iş silinmiş."; return; } jobs[i]={...jobs[i],...data}; }
     save.disabled=true; err.textContent="";
@@ -2943,7 +2963,7 @@ function customerView(c){
         el("b",{text:j.baslik||"İş"}),
         el("span",{class:"pill s-"+st,text:ST[st]}),
         typesOf(j)? el("span",{class:"jtypes",text:typesOf(j)}) : null,
-        el("small",{text:[j.sonTeklif? fmtMoney(j.sonTeklif.tutar,j.sonTeklif.pb):"", j.kesifTarihi? "Keşif "+fmtDate(j.kesifTarihi):"", nFiles? nFiles+" dosya":""].filter(Boolean).join(" · ")||"Henüz dosya yok"})));
+        el("small",{text:[j.durum==="satis"&&j.satis? "Satış "+fmtMoney(j.satis.tutar,j.satis.pb) : j.sonTeklif? fmtMoney(j.sonTeklif.tutar,j.sonTeklif.pb):"", j.kesifTarihi? "Keşif "+fmtDate(j.kesifTarihi):"", nFiles? nFiles+" dosya":""].filter(Boolean).join(" · ")||"Henüz dosya yok"})));
     }
     jsec.append(cards);
     out.push(jsec);
@@ -2976,7 +2996,8 @@ function jobDetail(c,j,jobs){
   for(const s of STATUSES){
     sb.append(el("button",{class:"chip",type:"button","aria-pressed":String(st===s.k),disabled:!writable,onclick:async()=>{
       if(st===s.k) return;
-      const cur=jobsOf(freshC(c.id)).map(x=>x.id===j.id? {...x,durum:s.k,guncelleme:nowISO()} : x);
+      let sale=null; if(s.k==="satis"){ sale=await askSale(j); if(!sale) return; }
+      const cur=jobsOf(freshC(c.id)).map(x=>x.id===j.id? {...x,durum:s.k,guncelleme:nowISO(),...(sale?{satis:sale}:{})} : x);
       try{ await saveJobs(c.id,cur); toast(`${j.baslik}: ${s.t}`); }catch(ex){ toast(writeErr(ex)); }
     }},s.t));
   }
@@ -2995,6 +3016,12 @@ function jobDetail(c,j,jobs){
     if(q) row("Harita", el("a",{href:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(q),target:"_blank",rel:"noopener"},"İşin adresini haritada aç ↗"));
   } else row("Konum", "Müşterinin adresi");
   if(j.sonTeklif) row("Son teklif", `${fmtMoney(j.sonTeklif.tutar,j.sonTeklif.pb)} · ${fmtDate(j.sonTeklif.tarih)}`);
+  if(st==="satis"){
+    const sv=j.satis, o=j.sonTeklif, df=sv&&o&&(sv.pb===(o.pb==="TL"?"TRY":(o.pb||"TRY")))?Number(o.tutar)-Number(sv.tutar):0;
+    const ed=writable? el("button",{class:"btn sm ghost",type:"button",style:"margin-left:8px",onclick:async()=>{ const sale=await askSale(j); if(!sale) return;
+      const cur=jobsOf(freshC(c.id)).map(x=>x.id===j.id? {...x,satis:sale,guncelleme:nowISO()} : x); try{ await saveJobs(c.id,cur); toast("Satış tutarı kaydedildi"); }catch(ex){ toast(writeErr(ex)); } }},sv?"Düzenle":"Satış tutarını gir") : null;
+    row("Satış tutarı", el("span",{}, el("b",{text:sv?fmtMoney(sv.tutar,sv.pb):"Girilmedi (panelde son teklif sayılıyor)"}), df>0.004? el("span",{class:"hint",text:` · iskonto ${fmtMoney(df,sv.pb)} (%${(df/Number(o.tutar)*100).toLocaleString("tr-TR",{maximumFractionDigits:1})})`}) : null, ed));
+  }
   row("Açılış", fmtDate(j.olusturma));
   box.append(kv);
   if(j.kesifNotu) box.append(el("div",{class:"csec"},el("h3",{},"Keşif notları"),el("div",{class:"cnote",text:j.kesifNotu})));
@@ -3571,14 +3598,14 @@ async function deleteCustomer(c,btn){
 /* ---------- CSV ---------- */
 async function exportCsv(){
   if(!downloads){ toast("Bu görünümde indirme kullanılamıyor"); return; }
-  const head=["Dosya no","Ad soyad","Firma/proje","Telefon","E-posta","İl","İlçe","Mahalle","Adres","Kaynak","İş","Durum","Ürün/kapsam","Şömine tipi","Hazne tipi","Keşif tarihi","Son teklif","İşin konumu"];
+  const head=["Dosya no","Ad soyad","Firma/proje","Telefon","E-posta","İl","İlçe","Mahalle","Adres","Kaynak","İş","Durum","Ürün/kapsam","Şömine tipi","Hazne tipi","Keşif tarihi","Son teklif","Satış tutarı","İşin konumu"];
   const q=v=>{ v=v==null?"":String(v); return /[";\n]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; };
   const lines=[head.join(";")];
   for(const c of filtered()){
     const base=[c.kod,c.ad,c.firma,c.telefon,c.eposta,c.il,c.ilce,c.mahalle,c.adres,c.kaynak];
     const jobs=jobsOf(c);
-    if(!jobs.length) lines.push([...base,"","","","","","","",""].map(q).join(";"));
-    for(const j of jobs) lines.push([...base, j.baslik, ST[j.durum||"yeni"], j.urun, arr(j.somineTipi).join(", "), arr(j.hazneTipi).join(", "), fmtDate(j.kesifTarihi), j.sonTeklif? fmtMoney(j.sonTeklif.tutar,j.sonTeklif.pb):"", (j.il||j.ilce||j.adres)? [j.adres,jobIlce(c,j),jobIl(c,j)].filter(Boolean).join(", ") : ""].map(q).join(";"));
+    if(!jobs.length) lines.push([...base,"","","","","","","","",""].map(q).join(";"));
+    for(const j of jobs) lines.push([...base, j.baslik, ST[j.durum||"yeni"], j.urun, arr(j.somineTipi).join(", "), arr(j.hazneTipi).join(", "), fmtDate(j.kesifTarihi), j.sonTeklif? fmtMoney(j.sonTeklif.tutar,j.sonTeklif.pb):"", j.durum==="satis"&&j.satis? fmtMoney(j.satis.tutar,j.satis.pb):"", (j.il||j.ilce||j.adres)? [j.adres,jobIlce(c,j),jobIl(c,j)].filter(Boolean).join(", ") : ""].map(q).join(";"));
   }
   try{ await downloads.save({filename:"musteriler-"+new Date().toISOString().slice(0,10)+".csv", data:"﻿"+lines.join("\r\n")}); }
   catch(e){ if(e?.code!=="declined") toast("İndirilemedi"); }
